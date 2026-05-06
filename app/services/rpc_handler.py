@@ -11,6 +11,7 @@ from app.crud import transaction as transaction_crud
 from app.crud.order import update_order_status
 from app.models.transaction import Transaction
 from app.models.order import Order, OrderStatus
+from app.models.cart import Cart
 
 
 # Error codes from specification
@@ -307,6 +308,13 @@ class RpcHandler:
 
         order_db_id: Optional[int] = None
 
+        # Special case: some client flows pass cart public id like "cart_1".
+        # In that case we either find an existing PENDING order for the user+amount,
+        # or create a new order from the cart, then mark it PAID.
+        if isinstance(order, str) and order.startswith("cart_"):
+            await self._mark_order_paid_from_cart_reference(tx, order)
+            return
+
         if isinstance(order, str) and order.startswith("order_"):
             _, _, maybe_id = order.partition("_")
             try:
@@ -352,4 +360,111 @@ class RpcHandler:
         try:
             await clear_cart(self.db, updated_order.user_id)
         except Exception as exc:  # pragma: no cover - defensive logging
+            self._logger.warning("Failed to clear cart after payment for order %s: %s", updated_order.id, exc)
+
+    async def _mark_order_paid_from_cart_reference(self, tx: Transaction, cart_ref: str) -> None:
+        """Handle tx.account_data.order like 'cart_1'.
+
+        Contract:
+        - cart_ref is a public cart id: 'cart_{cart_id}'
+        - tx.amount is in tiyin
+
+        Behaviour:
+        - Try to map to an existing pending order (same user, matching amount)
+        - Otherwise create an order from cart items
+        - Mark order PAID and clear cart
+        """
+
+        from app.crud.cart import clear_cart
+        from app.crud.order import create_order
+        from app.schemas.order import OrderCreate, OrderItemCreate
+        from app.models.cart import CartItem
+
+        try:
+            _, _, maybe_id = cart_ref.partition("_")
+            cart_id = int(maybe_id)
+        except Exception:
+            self._logger.warning("Invalid cart reference in tx account data: %s (tx=%s)", cart_ref, getattr(tx, "id", None))
+            return
+
+        cart = (
+            await self.db.execute(
+                select(Cart).where(Cart.id == cart_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if not cart:
+            self._logger.warning("Cart not found for %s (tx=%s)", cart_ref, getattr(tx, "id", None))
+            return
+
+        # Load items explicitly to avoid MissingGreenlet (relationship lazy-load)
+        items = (
+            await self.db.execute(
+                select(CartItem)
+                .where(CartItem.cart_id == cart.id)
+                .order_by(CartItem.id.asc())
+            )
+        ).scalars().all()
+        if not items:
+            self._logger.warning("Cart %s has no items; can't create/find order (tx=%s)", cart_ref, getattr(tx, "id", None))
+            return
+
+        # Try to find an existing PENDING order for this user that matches tx amount.
+        # (order.total_amount stored in tiyin)
+        expected_amount = int(getattr(tx, "amount", 0) or 0)
+        matched_order = None
+        try:
+            q = (
+                select(Order)
+                .where(
+                    Order.user_id == cart.user_id,
+                    Order.status == OrderStatus.PENDING,
+                )
+                .order_by(Order.id.desc())
+            )
+            user_orders = (await self.db.execute(q)).scalars().all()
+            for o in user_orders:
+                try:
+                    if int(o.total_amount or 0) == expected_amount:
+                        matched_order = o
+                        break
+                except Exception:
+                    continue
+        except Exception as exc:
+            self._logger.warning("Pending order lookup failed for cart %s: %s", cart_ref, exc)
+
+        if matched_order is None:
+            # Create an order from cart.
+            items_source = [
+                OrderItemCreate(slipper_id=ci.slipper_id, quantity=int(ci.quantity), unit_price=1.0, notes=None)
+                for ci in items
+            ]
+            internal_order = OrderCreate(
+                order_id=None,
+                user_id=cart.user_id,
+                items=items_source,
+                notes=f"Auto-created from {cart_ref} after payment",
+            )
+            try:
+                matched_order = await create_order(
+                    self.db,
+                    internal_order,
+                    idempotency_key=None,
+                    merge_fallback=False,
+                )
+                self._logger.info("Created order %s from %s (tx=%s)", matched_order.id, cart_ref, getattr(tx, "id", None))
+            except Exception as exc:
+                self._logger.exception("Failed to create order from %s (tx=%s): %s", cart_ref, getattr(tx, "id", None), exc)
+                return
+
+        # Mark PAID
+        self._logger.info("Attempting to mark order %s as PAID (from %s, tx=%s)", matched_order.id, cart_ref, getattr(tx, "id", None))
+        updated_order = await update_order_status(self.db, order_id=int(matched_order.id), status=OrderStatus.PAID)
+        if not updated_order:
+            self._logger.warning("Failed to update order status to PAID for order id %s (tx=%s)", matched_order.id, getattr(tx, "id", None))
+            return
+
+        # Clear cart after successful payment
+        try:
+            await clear_cart(self.db, updated_order.user_id)
+        except Exception as exc:  # pragma: no cover
             self._logger.warning("Failed to clear cart after payment for order %s: %s", updated_order.id, exc)

@@ -1,0 +1,31 @@
+[Unit]
+Description=StepUp payment reconcile daemon (CheckTransaction -> PAID)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Choose a real user that has access to your project folder and env file.
+# Common choices: www-data, ubuntu, stepup
+User=www-data
+
+# IMPORTANT: the project root must be the working directory so `.env` relative loading works.
+WorkingDirectory=/var/www/StepUp
+
+# If you keep your env in the project root, keep this line.
+# Otherwise point to the real path.
+EnvironmentFile=/var/www/StepUp/.env
+
+# Use the absolute path to python3 on your server.
+# You can find it via: `which python3`
+ExecStart=/usr/bin/python3 scripts/auto_reconcile_daemon.py --interval 30
+
+Restart=always
+RestartSec=3
+
+# Basic hardening (optional)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

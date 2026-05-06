@@ -34,10 +34,16 @@ logger = logging.getLogger("auto_reconcile")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-async def check_remote_tx(client: httpx.AsyncClient, tx_id: str) -> Optional[dict]:
-    base = settings.ACQUIRING_BASE_URL or os.getenv("ACQUIRING_BASE_URL")
+async def check_remote_tx(client: httpx.AsyncClient, tx_id: str, *, debug_acquirer: bool = False) -> Optional[dict]:
+    # In some deployments the same base is stored under PAYMENT_BASE_URL.
+    base = (
+        getattr(settings, "ACQUIRING_BASE_URL", None)
+        or os.getenv("ACQUIRING_BASE_URL")
+        or getattr(settings, "PAYMENT_BASE_URL", None)
+        or os.getenv("PAYMENT_BASE_URL")
+    )
     if not base:
-        logger.warning("ACQUIRING_BASE_URL not configured")
+        logger.warning("Neither ACQUIRING_BASE_URL nor PAYMENT_BASE_URL configured; can't poll acquirer")
         return None
     url = base.rstrip("/") + "/rpc"
     payload = {"jsonrpc": "2.0", "method": "CheckTransaction", "params": {"id": tx_id}, "id": 1}
@@ -48,8 +54,16 @@ async def check_remote_tx(client: httpx.AsyncClient, tx_id: str) -> Optional[dic
         if not isinstance(data, dict):
             logger.warning("Unexpected acquirer response for %s: %s", tx_id, data)
             return None
+        if debug_acquirer:
+            # Important: we never log credentials. Only the bank JSON-RPC payload.
+            # This helps diagnose when the bank returns a different schema.
+            logger.info("Acquirer raw response for %s: %s", tx_id, data)
         if data.get("error"):
-            logger.debug("Acquirer returned error for %s: %s", tx_id, data.get("error"))
+            # Use info level in debug mode so it shows up in systemd logs.
+            if debug_acquirer:
+                logger.info("Acquirer returned JSON-RPC error for %s: %s", tx_id, data.get("error"))
+            else:
+                logger.debug("Acquirer returned error for %s: %s", tx_id, data.get("error"))
             return None
         return data.get("result")
     except Exception as exc:
@@ -57,7 +71,7 @@ async def check_remote_tx(client: httpx.AsyncClient, tx_id: str) -> Optional[dic
         return None
 
 
-async def reconcile_pass(dry_run: bool = False, interval: int = 60):
+async def reconcile_pass(dry_run: bool = False, interval: int = 60, *, debug_acquirer: bool = False):
     # prepare HTTP client auth
     basic_user = settings.ACQUIRING_RPC_BASIC_USERNAME
     if hasattr(settings.ACQUIRING_RPC_BASIC_PASSWORD, "get_secret_value"):
@@ -66,11 +80,28 @@ async def reconcile_pass(dry_run: bool = False, interval: int = 60):
         basic_pass = str(settings.ACQUIRING_RPC_BASIC_PASSWORD) if settings.ACQUIRING_RPC_BASIC_PASSWORD else os.getenv("ACQUIRING_RPC_BASIC_PASSWORD")
     auth = (basic_user, basic_pass) if basic_user and basic_pass else None
 
+    rpc_base = (
+        getattr(settings, "ACQUIRING_BASE_URL", None)
+        or os.getenv("ACQUIRING_BASE_URL")
+        or getattr(settings, "PAYMENT_BASE_URL", None)
+        or os.getenv("PAYMENT_BASE_URL")
+        or ""
+    )
+    rpc_url = (rpc_base.rstrip("/") + "/rpc") if rpc_base else ""
+    logger.info(
+        "Daemon config: rpc=%s auth=%s interval=%ss dry_run=%s",
+        rpc_url or "<missing>",
+        "basic" if auth else "none",
+        interval,
+        dry_run,
+    )
+
     async with AsyncSessionLocal() as db:
         async with httpx.AsyncClient(auth=auth, timeout=30.0) as client:
             while True:
                 try:
-                    result = await db.execute(select(Transaction).where(Transaction.state == 1))
+                    # Pending/created transactions are usually state=1, but some banks use 0 for 'created'.
+                    result = await db.execute(select(Transaction).where(Transaction.state.in_([0, 1])))
                     txs = result.scalars().all()
                 except Exception as exc:
                     logger.exception("DB error while fetching pending transactions: %s", exc)
@@ -86,7 +117,7 @@ async def reconcile_pass(dry_run: bool = False, interval: int = 60):
                     if not tx_id:
                         continue
                     logger.info("Checking tx %s (local pk=%s)", tx_id, getattr(tx, "pk", None))
-                    res = await check_remote_tx(client, tx_id)
+                    res = await check_remote_tx(client, tx_id, debug_acquirer=debug_acquirer)
                     if not res:
                         logger.debug("No remote result for %s", tx_id)
                         continue
@@ -138,13 +169,24 @@ def main():
     parser = argparse.ArgumentParser(description="Auto reconcile daemon")
     parser.add_argument("--interval", type=int, default=60, help="Poll interval seconds")
     parser.add_argument("--dry-run", action="store_true", help="Do not apply changes; only log")
+    parser.add_argument(
+        "--debug-acquirer",
+        action="store_true",
+        help="Log raw JSON-RPC responses from the acquirer (use temporarily for troubleshooting)",
+    )
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     _setup_signal(loop)
     try:
-        loop.run_until_complete(reconcile_pass(dry_run=args.dry_run, interval=args.interval))
+        loop.run_until_complete(
+            reconcile_pass(
+                dry_run=args.dry_run,
+                interval=args.interval,
+                debug_acquirer=args.debug_acquirer,
+            )
+        )
     except asyncio.CancelledError:
         logger.info("Daemon cancelled")
     finally:
