@@ -58,24 +58,29 @@ async def create_order_from_cart(
     if payload.cart_id != public_cart_id:
         raise HTTPException(status_code=400, detail="cart_id does not match current user's cart")
 
-    # Use authoritative aggregated totals from DB to avoid float/truncation or lazy-load
-    # inconsistencies. get_cart_totals returns (total_items, total_quantity, total_amount)
-    # where total_amount is in UZS (float). The public API expects integer UZS.
+    # Use the authoritative integer UZS total (exactly matching the public cart contract).
+    # NOTE: StepUp.price is stored as float, but both public cart response and DB aggregation
+    # cast it to INTEGER UZS before computing totals.
     total_items, total_quantity, total_amount = await get_cart_totals(db, user.id)
 
     # Defensive checks
     if total_items <= 0 or total_quantity <= 0 or total_amount <= 0:
         raise HTTPException(status_code=400, detail="Cart total is zero")
 
-    # Normalize server total to integer UZS using rounding to avoid tiny FP drift
-    server_total_uzs = int(round(float(total_amount)))
+    # get_cart_totals already mirrors public cart rounding/casting; keep it deterministic
+    server_total_uzs = int(total_amount)
     client_amount_int = int(payload.amount)
 
     if client_amount_int != server_total_uzs:
-        # Give more helpful feedback including both values for easier debugging
+        # Typical cause: cart changed (items/qty/price) but client used a stale total.
+        # Return an actionable message.
         raise HTTPException(
             status_code=400,
-            detail=f"Amount does not match cart total (client={client_amount_int}, server={server_total_uzs})",
+            detail=(
+                "Amount does not match cart total "
+                f"(client={client_amount_int}, server={server_total_uzs}, cart_id={public_cart_id}). "
+                "Refresh cart and retry."
+            ),
         )
 
     # Build items from cart lines; unit_price is determined from DB at creation time
