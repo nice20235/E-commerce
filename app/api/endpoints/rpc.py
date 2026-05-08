@@ -6,9 +6,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.database import get_db
 from app.crud import transaction as transaction_crud
+from app.models.order import Order, OrderStatus
 from app.schemas.transaction import (
     JSONRPCRequest,
     JSONRPCErrorResponse,
@@ -224,6 +226,45 @@ async def rpc_entrypoint(request: Request, db: AsyncSession = Depends(get_db)) -
         tx = await transaction_crud.get_by_acquirer_id(db, params.id)
         if not tx:
             return rpc_error(rpc_id, ERROR_TRANSACTION_NOT_FOUND, "Transaction not found")
+
+        # Side-effect reconciliation:
+        # If the transaction is performed/paid, mark the linked order as PAID.
+        # Link is stored in tx.account_data JSON under `order_id`.
+        if int(getattr(tx, "state", 0) or 0) == 2 and int(getattr(tx, "perform_time", 0) or 0) > 0:
+            account = tx.account_data or {}
+            # Support both `order_id` and legacy `order` keys.
+            order_ref = account.get("order_id") or account.get("order")
+            if order_ref is not None:
+                order_obj = None
+                # 1) If order_ref looks like an integer DB id, match by Order.id
+                try:
+                    if isinstance(order_ref, int) or (isinstance(order_ref, str) and order_ref.isdigit()):
+                        order_db_id = int(order_ref)
+                        order_obj = (await db.execute(select(Order).where(Order.id == order_db_id).limit(1))).scalar_one_or_none()
+                except Exception:
+                    order_obj = None
+
+                # 2) Otherwise try matching by public order_id string
+                if order_obj is None:
+                    try:
+                        order_obj = (
+                            await db.execute(
+                                select(Order).where(Order.order_id == str(order_ref)).limit(1)
+                            )
+                        ).scalar_one_or_none()
+                    except Exception:
+                        order_obj = None
+
+                # Update only if found and not already PAID
+                if order_obj is not None and order_obj.status != OrderStatus.PAID:
+                    order_obj.status = OrderStatus.PAID
+                    db.add(order_obj)
+                    await db.commit()
+                    # Best-effort refresh
+                    try:
+                        await db.refresh(order_obj)
+                    except Exception:
+                        pass
 
         result = CheckTransactionResult(
             create_time=tx.create_time,
