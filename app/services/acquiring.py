@@ -140,7 +140,7 @@ class AcquiringClient:
 
         # Build canonical payment URL using environment-provided values.
         # Format:
-        # https://pay.apexbank.uz/merchant?clientId={PARTNER_ID}&order_id={order_id}&amount={amount}&currency=UZS
+        # https://pay.apexbank.uz/merchant?clientId={PARTNER_ID}&invoice_id={order_id}&amount={amount}&currency=UZS
 
         partner = getattr(settings, "PARTNER_ID", None) or None
         payment_base = getattr(settings, "PAYMENT_BASE_URL", None) or None
@@ -155,4 +155,5 @@ class AcquiringClient:
         client_id = partner or ""
 
         # Amount is expected to be integer (tiyin) by the caller
-        return f"{payment_base}?clientId={client_id}&order_id={order_id}&amount={amount}&currency=UZS"
+        # Bank expects invoice_id query parameter; value is our internal order_id.
+        return f"{payment_base}?clientId={client_id}&invoice_id={order_id}&amount={amount}&currency=UZS"
