@@ -113,9 +113,17 @@ async def create_order_from_cart(
     # against payload.amount. The actual order.total_amount is computed and
     # stored in tiyin (UZS * 100) inside create_order, so we don't override it here.
 
+    # Clear cart after successful order creation so items don't reappear on refresh
+    try:
+        await clear_cart_fn(db, user.id)
+    except Exception:
+        # Best-effort; order is already created
+        pass
+
     # Invalidate caches
     from app.core.cache import invalidate_cache_pattern
     await invalidate_cache_pattern("orders:")
+    await invalidate_cache_pattern("Cart:get_my_cart")
 
     created_compact = format_tashkent_compact(new_order.created_at)
     # Explicitly fetch items for response

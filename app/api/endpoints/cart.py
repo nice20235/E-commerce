@@ -23,6 +23,7 @@ from app.crud.cart import (
     get_cart,
     get_cart_totals,
 )
+from app.core.cache import invalidate_cache_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -136,28 +137,45 @@ async def add_cart_item(payload: CartAddItemRequest, user=Depends(get_current_us
         # Should not normally happen, but guard against edge cases
         raise HTTPException(status_code=500, detail="Cart not found after update")
 
+    # Invalidate cached cart reads
+    await invalidate_cache_pattern("Cart:get_my_cart")
     return _serialize_public(cart)
 
-@router.put("/items/{cart_item_id}", response_model=CartOut)
+@router.put("/items/{cart_item_id}", response_model=CartPublicResponse)
 async def update_cart_item(cart_item_id: int, payload: CartItemUpdate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        cart = await update_item(db, user.id, cart_item_id, payload)
+        await update_item(db, user.id, cart_item_id, payload)
     except ValueError as e:
         msg = str(e)
         status = 404 if "not found" in msg.lower() else 400
         raise HTTPException(status_code=status, detail=msg)
-    return _serialize(cart)
 
-@router.delete("/items/{cart_item_id}", response_model=CartOut)
+    cart = await get_cart(db, user.id)
+    if cart is None:
+        raise HTTPException(status_code=500, detail="Cart not found after update")
+    await invalidate_cache_pattern("Cart:get_my_cart")
+    return _serialize_public(cart)
+
+@router.delete("/items/{cart_item_id}", response_model=CartPublicResponse)
 async def delete_cart_item(cart_item_id: int, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        cart = await remove_item(db, user.id, cart_item_id)
+        await remove_item(db, user.id, cart_item_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _serialize(cart)
 
-@router.delete("/clear", response_model=CartOut)
+    cart = await get_cart(db, user.id)
+    if cart is None:
+        raise HTTPException(status_code=500, detail="Cart not found after update")
+    await invalidate_cache_pattern("Cart:get_my_cart")
+    return _serialize_public(cart)
+
+@router.delete("/clear", response_model=CartPublicResponse)
 async def clear_my_cart(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    cart = await clear_cart(db, user.id)
-    return _serialize(cart)
+    await clear_cart(db, user.id)
+    cart = await get_cart(db, user.id)
+    # If cart is missing, create it (clearing should not delete the cart itself)
+    if cart is None:
+        cart = await get_or_create_cart(db, user.id)
+    await invalidate_cache_pattern("Cart:get_my_cart")
+    return _serialize_public(cart)
 
