@@ -1,0 +1,44 @@
+#################################################################
+# Runtime dependencies for Slippers API
+# (Pinned versions for determinism; review quarterly)
+#################################################################
+
+fastapi==0.104.1
+starlette==0.27.0          # FastAPI dependency (explicit for clarity)
+uvicorn[standard]==0.24.0  # ASGI server with uvloop / httptools extras
+
+SQLAlchemy==2.0.23
+asyncpg==0.29.0             # PostgreSQL async driver
+
+pydantic==2.5.0
+pydantic-core==2.14.1
+pydantic-settings==2.1.0
+annotated-types==0.7.0
+typing_extensions==4.14.1
+
+anyio==3.7.1                # Concurrency backend
+sniffio==1.3.1
+
+python-multipart==0.0.6     # File uploads
+python-dotenv==1.0.0        # .env loading
+python-jose==3.3.0          # JWT
+
+# Password hashing
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+greenlet==3.2.4             # SQLAlchemy async internals
+
+MarkupSafe==3.0.2
+packaging==25.0
+
+# Transports / protocol dependencies
+h11==0.16.0
+httptools==0.6.4
+websockets==15.0.1
+
+# HTTP client for acquiring integrations
+httpx==0.25.2
+
+# Timezone database for zoneinfo on Windows environments
+tzdata==2024.1
