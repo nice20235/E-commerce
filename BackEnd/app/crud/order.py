@@ -59,20 +59,21 @@ async def get_orders(
     if conditions:
         query = query.where(and_(*conditions))
     
-    # Add relationships if needed
+    # Order by created_at for consistent results (apply before adding eager loaders)
+    query = query.order_by(Order.created_at.desc())
+
+    # Count on the plain filtered query *before* adding eager-load options so
+    # that joinedload joins don't multiply rows and inflate the total.
+    count_query = select(func.count()).select_from(query.subquery())
+    count_result = await db.execute(count_query)
+    total = count_result.scalar() or 0
+
+    # Add relationships after the count
     if load_relationships:
         query = query.options(
             joinedload(Order.user),
             selectinload(Order.items).selectinload(OrderItem.slipper)
         )
-    
-    # Order by created_at for consistent results
-    query = query.order_by(Order.created_at.desc())
-    
-    # Sequential execution to avoid SQLite concurrent operations
-    count_query = select(func.count()).select_from(query.subquery())
-    count_result = await db.execute(count_query)
-    total = count_result.scalar() or 0
 
     data_result = await db.execute(query.offset(skip).limit(limit))
     # Ensure uniqueness when eager loaders are involved

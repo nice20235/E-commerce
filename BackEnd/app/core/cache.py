@@ -104,14 +104,12 @@ def cached(ttl: int = 60, key_prefix: str = ""):  # Reduced from 300 to 60 secon
     return decorator
 
 async def invalidate_cache_pattern(pattern: str) -> None:
-    """Invalidate cache entries matching pattern"""
-    await cache.cleanup_expired()
-    # Simple pattern matching - in production, use Redis with pattern support
-    keys_to_delete = []
+    """Invalidate cache entries matching pattern.
+
+    Holds the lock for the entire scan-and-delete to avoid a race where another
+    coroutine re-inserts a matching key between the scan and the deletion.
+    """
     async with cache._lock:
-        for key in cache._cache.keys():
-            if pattern in key:
-                keys_to_delete.append(key)
-    
-    for key in keys_to_delete:
-        await cache.delete(key)
+        keys_to_delete = [key for key in cache._cache if pattern in key]
+        for key in keys_to_delete:
+            cache._cache.pop(key, None)

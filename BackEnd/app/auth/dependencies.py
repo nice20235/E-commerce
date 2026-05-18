@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status, Request
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError as JWTError
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db

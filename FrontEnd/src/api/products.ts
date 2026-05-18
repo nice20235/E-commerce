@@ -8,8 +8,14 @@ export interface ProductFilters {
   sort?: SortOption
 }
 
-export const getProducts = (filters: ProductFilters = {}) =>
-  client.get<ProductListResponse>('/stepups/', { params: filters }).then((r) => r.data)
+export const getProducts = (filters: ProductFilters = {}) => {
+  const params: Record<string, string | number> = {}
+  if (filters.skip !== undefined) params.skip = filters.skip
+  if (filters.limit !== undefined) params.limit = filters.limit
+  if (filters.sort !== undefined) params.sort = filters.sort
+  if (filters.search) params.search = filters.search
+  return client.get<ProductListResponse>('/stepups/', { params }).then((r) => r.data)
+}
 
 export const getProduct = (id: number, include_images = true) =>
   client.get<Product>(`/stepups/${id}`, { params: { include_images } }).then((r) => r.data)

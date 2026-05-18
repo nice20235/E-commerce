@@ -29,7 +29,7 @@ export const translations = {
     // ProductCard
     addToCart: "Savatga qo'shish",
     adding: "Qo'shilmoqda…",
-    added: "✓ Qo'shildi",
+    added: "Qo'shildi",
     outOfStock: 'Tugagan',
     size: "O'lcham",
     left: 'qoldi',
@@ -55,7 +55,7 @@ export const translations = {
     items: 'ta mahsulot',
 
     // Checkout
-    checkoutTitle: 'Checkout',
+    checkoutTitle: 'Buyurtma',
     orderSummary: 'Buyurtma xulosasi',
     placeOrder: 'Buyurtma berish',
     backToCart: 'Savatga qaytish',
@@ -82,6 +82,11 @@ export const translations = {
     noAccount: 'Akkount yo\'qmi?',
     createOne: 'Yaratish',
     forgotPassword: 'Parolni unutdingizmi?',
+    invalidCredentials: 'Login yoki parol noto\'g\'ri',
+    loginFailed: 'Kirishda xatolik. Qayta urinib ko\'ring.',
+    userExists: 'Bu foydalanuvchi nomi allaqachon band',
+    phoneExists: 'Bu telefon raqami allaqachon ro\'yxatdan o\'tgan',
+    registerFailed: 'Ro\'yxatdan o\'tishda xatolik yuz berdi',
 
     // Auth - Register
     createAccount: 'Akkount yaratish',
@@ -115,7 +120,7 @@ export const translations = {
     newProduct: '+ Yangi',
     cancel: 'Bekor qilish',
     name: 'Nomi',
-    price: 'Narx (UZS)',
+    price: 'Narx',
     stock: 'Omborda',
     actions: 'Amallar',
     edit: 'Tahrirlash',
@@ -164,6 +169,14 @@ export const translations = {
     newPassRequired: 'Yangi parolni kiriting',
     passMinLength: 'Kamida 8 ta belgi',
     passMismatch: 'Parollar mos kelmaydi',
+
+    // Home - search result / show all
+    searchResult: 'Qidiruv natijasi',
+    showAllProducts: 'Barcha mahsulotlar',
+
+    // Orders - count labels
+    ordersCount: 'ta buyurtma',
+    moreItems: 'ta yana',
   },
   ru: {
     // Navbar
@@ -193,7 +206,7 @@ export const translations = {
     // ProductCard
     addToCart: 'В корзину',
     adding: 'Добавляется…',
-    added: '✓ Добавлено',
+    added: 'Добавлено',
     outOfStock: 'Нет в наличии',
     size: 'Размер',
     left: 'осталось',
@@ -246,6 +259,11 @@ export const translations = {
     noAccount: 'Нет аккаунта?',
     createOne: 'Создать',
     forgotPassword: 'Забыли пароль?',
+    invalidCredentials: 'Неверный логин или пароль',
+    loginFailed: 'Ошибка входа. Попробуйте ещё раз.',
+    userExists: 'Это имя пользователя уже занято',
+    phoneExists: 'Этот номер телефона уже зарегистрирован',
+    registerFailed: 'Ошибка при регистрации',
 
     // Auth - Register
     createAccount: 'Создать аккаунт',
@@ -279,7 +297,7 @@ export const translations = {
     newProduct: '+ Новый',
     cancel: 'Отмена',
     name: 'Название',
-    price: 'Цена (UZS)',
+    price: 'Цена',
     stock: 'На складе',
     actions: 'Действия',
     edit: 'Изменить',
@@ -328,6 +346,14 @@ export const translations = {
     newPassRequired: 'Введите новый пароль',
     passMinLength: 'Минимум 8 символов',
     passMismatch: 'Пароли не совпадают',
+
+    // Home - search result / show all
+    searchResult: 'Результат поиска',
+    showAllProducts: 'Все товары',
+
+    // Orders - count labels
+    ordersCount: 'заказов',
+    moreItems: 'ещё',
   },
 } satisfies Record<Lang, Record<string, string>>
 

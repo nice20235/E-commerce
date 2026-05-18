@@ -1,21 +1,36 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getOrders, updateOrderStatus } from '../../api/orders'
+import { useQuery } from '@tanstack/react-query'
+import { getOrders } from '../../api/orders'
 import type { Order } from '../../types'
 import { useLang } from '../../store/lang'
 
-const STATUS_STYLES: Record<Order['status'], { dotColor: string; textColor: string; bg: string }> = {
-  PENDING:  { dotColor: '#f59e0b', textColor: '#92400e', bg: '#fffbeb' },
-  PAID:     { dotColor: '#4ade80', textColor: '#166534', bg: '#f0fdf4' },
-  REFUNDED: { dotColor: '#9ca3af', textColor: '#4b5563', bg: '#f3f4f6' },
+const STATUS_CONFIG: Record<Order['status'], {
+  dotColor: string
+  textColor: string
+  bg: string
+  label: { uz: string; ru: string }
+}> = {
+  PENDING:  { dotColor: '#f59e0b', textColor: '#92400e', bg: '#fffbeb', label: { uz: 'Kutilmoqda', ru: 'Ожидает' } },
+  PAID:     { dotColor: '#4ade80', textColor: '#166534', bg: '#f0fdf4', label: { uz: "To'langan", ru: 'Оплачен' } },
+  REFUNDED: { dotColor: '#9ca3af', textColor: '#4b5563', bg: '#f3f4f6', label: { uz: 'Qaytarilgan', ru: 'Возврат' } },
 }
 const STATUS_OPTIONS: Order['status'][] = ['PENDING', 'PAID', 'REFUNDED']
 
+function formatDate(raw: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }).format(new Date(raw))
+  } catch {
+    return raw
+  }
+}
+
 export default function AllOrders() {
-  const queryClient = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<Order['status'] | 'ALL'>('ALL')
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   const { data: orders, isLoading, isError } = useQuery({
     queryKey: ['orders'],
@@ -23,90 +38,177 @@ export default function AllOrders() {
     staleTime: 15_000,
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: Order['status'] }) => updateOrderStatus(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orders'] }),
-  })
-
   const filtered = orders?.filter(
     (o) => filterStatus === 'ALL' || o.status === filterStatus
   )
 
-  if (isLoading) return (
-    <div className="space-y-3">
-      {[1, 2, 3, 4].map((i) => <div key={i} className="rounded-2xl h-16 shimmer" style={{ background: '#fff' }} />)}
-    </div>
-  )
+  const filterLabel = (s: Order['status'] | 'ALL') => {
+    if (s === 'ALL') return lang === 'uz' ? 'Barchasi' : 'Все'
+    return STATUS_CONFIG[s].label[lang]
+  }
 
-  if (isError) return <p className="text-sm font-medium" style={{ color: '#ff4d1c' }}>Failed to load orders.</p>
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-black" style={{ color: '#1a2f4e' }}>
-          {t('allOrders')}
-          <span className="ml-2 text-sm font-normal" style={{ color: '#888' }}>({filtered?.length ?? 0})</span>
-        </h1>
-        <div className="flex gap-1.5">
-          {(['ALL', ...STATUS_OPTIONS] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
-              style={{
-                background: filterStatus === s ? '#1a2f4e' : '#fff',
-                color: filterStatus === s ? '#fff' : '#888',
-                border: `1px solid ${filterStatus === s ? '#1a2f4e' : '#e8e5e0'}`,
-              }}
-              onMouseEnter={e => { if (filterStatus !== s) { e.currentTarget.style.borderColor = '#1a2f4e'; e.currentTarget.style.color = '#1a2f4e' } }}
-              onMouseLeave={e => { if (filterStatus !== s) { e.currentTarget.style.borderColor = '#e8e5e0'; e.currentTarget.style.color = '#888' } }}
-            >
-              {s}
-            </button>
+  if (isLoading) {
+    return (
+      <div>
+        <div className="h-7 shimmer rounded-xl w-40 mb-5 sm:mb-6" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+              <div className="flex items-center gap-4 px-4 sm:px-5 py-4">
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 shimmer rounded w-1/3" />
+                  <div className="h-3 shimmer rounded w-1/4" />
+                </div>
+                <div className="h-6 shimmer rounded-full w-20" />
+                <div className="text-right space-y-1.5">
+                  <div className="h-4 shimmer rounded w-20" />
+                  <div className="h-3 shimmer rounded w-10 ml-auto" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
+    )
+  }
 
-      {!filtered?.length ? (
-        <div className="rounded-2xl p-12 text-center text-sm" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', color: '#888' }}>
-          {t('noOrdersFound')}
+  if (isError) {
+    return (
+      <div className="rounded-2xl p-8 text-center" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+        <p className="text-sm font-semibold" style={{ color: '#dc2626' }}>Failed to load orders.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Header + filter */}
+      <div className="flex flex-col gap-4 mb-5 sm:mb-6">
+        <div>
+          <h1 className="text-lg sm:text-xl font-black" style={{ color: '#1a2f4e' }}>{t('allOrders')}</h1>
+          <p className="text-sm mt-0.5" style={{ color: '#888' }}>
+            {filtered?.length ?? 0} {lang === 'uz' ? 'ta buyurtma' : 'заказов'}
+          </p>
         </div>
-      ) : (
+
+        {/* Status filter chips — horizontal scroll on mobile */}
+        <div
+          className="flex gap-1.5 overflow-x-auto pb-1"
+          style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+        >
+          {(['ALL', ...STATUS_OPTIONS] as const).map((s) => {
+            const isActive = filterStatus === s
+            const cfg = s !== 'ALL' ? STATUS_CONFIG[s] : null
+            return (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className="inline-flex items-center gap-1.5 text-xs rounded-full font-semibold transition-all flex-shrink-0"
+                style={{
+                  background: isActive ? '#1a2f4e' : '#fff',
+                  color: isActive ? '#fff' : '#888',
+                  border: `1.5px solid ${isActive ? '#1a2f4e' : '#e8e5e0'}`,
+                  boxShadow: isActive ? '0 2px 8px rgba(26,47,78,0.2)' : 'none',
+                  padding: '8px 12px',
+                  minHeight: 36,
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = '#1a2f4e'
+                    e.currentTarget.style.color = '#1a2f4e'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = '#e8e5e0'
+                    e.currentTarget.style.color = '#888'
+                  }
+                }}
+              >
+                {cfg && (
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ background: isActive ? '#fff' : cfg.dotColor }}
+                  />
+                )}
+                {filterLabel(s)}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Empty state */}
+      {!filtered?.length && (
+        <div className="rounded-2xl p-10 sm:p-12 text-center" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: '#f0ede8' }}>
+            <svg className="w-7 h-7" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold" style={{ color: '#888' }}>{t('noOrdersFound')}</p>
+        </div>
+      )}
+
+      {/* Orders list */}
+      {!!filtered?.length && (
         <div className="space-y-3">
           {filtered.map((order) => {
             const numericId = Number(order.order_id.replace('order_', ''))
             const isExpanded = expandedId === order.order_id
-            const s = STATUS_STYLES[order.status] ?? STATUS_STYLES.PENDING
+            const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING
+            const statusLabel = s.label[lang] ?? order.status
 
             return (
-              <div key={order.order_id} className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+              <div
+                key={order.order_id}
+                className="rounded-2xl overflow-hidden transition-shadow"
+                style={{
+                  background: '#fff',
+                  boxShadow: isExpanded ? '0 8px 32px rgba(0,0,0,0.11)' : '0 2px 16px rgba(0,0,0,0.07)',
+                }}
+              >
+                {/* Collapsed row */}
                 <button
                   type="button"
                   aria-expanded={isExpanded}
-                  aria-label={`${isExpanded ? 'Collapse' : 'Expand'} order ${order.order_id}`}
-                  className="w-full flex items-center gap-4 px-5 py-4 cursor-pointer transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 sm:px-5 py-4 cursor-pointer transition-colors text-left"
                   style={{ color: '#1a2f4e', background: 'transparent' }}
                   onClick={() => setExpandedId(isExpanded ? null : order.order_id)}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#faf9f7')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#faf9f7' }}
+                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent' }}
                 >
+                  {/* Left: order ID + user */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-sm font-medium" style={{ color: '#1a2f4e' }}>{order.order_id}</span>
-                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: s.bg }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dotColor }} />
-                        <span className="text-[10px] font-bold" style={{ color: s.textColor }}>{order.status}</span>
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="font-mono text-xs sm:text-sm font-semibold" style={{ color: '#1a2f4e', wordBreak: 'break-all' }}>{order.order_id}</span>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: s.bg }}>
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.dotColor }} />
+                        <span className="text-[10px] font-bold" style={{ color: s.textColor }}>{statusLabel}</span>
                       </div>
                     </div>
-                    <p className="text-xs" style={{ color: '#888' }}>{order.user_name ?? `User #${order.user_id}`} · {order.created_at}</p>
+                    <p className="text-xs" style={{ color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {order.user_name ?? `User #${order.user_id}`}
+                      {' · '}
+                      {formatDate(order.created_at)}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold" style={{ color: '#1a2f4e' }}>{(order.total_amount / 100).toLocaleString()} UZS</p>
-                    <p className="text-xs" style={{ color: '#888' }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+
+                  {/* Right: amount */}
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-black text-sm" style={{ color: '#1a2f4e' }}>
+                      {(order.total_amount / 100).toLocaleString()}
+                      <span className="text-[10px] ml-0.5 font-normal" style={{ color: '#ccc' }}>UZS</span>
+                    </p>
+                    <p className="text-xs" style={{ color: '#bbb' }}>
+                      {order.items.length} {order.items.length !== 1 ? 'items' : 'item'}
+                    </p>
                   </div>
+
+                  {/* Chevron */}
                   <svg
                     className={`w-4 h-4 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    style={{ color: '#888' }}
+                    style={{ color: '#ccc' }}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -116,43 +218,43 @@ export default function AllOrders() {
                   </svg>
                 </button>
 
+                {/* Expanded detail */}
                 {isExpanded && (
-                  <div className="px-5 py-4" style={{ borderTop: '1px solid rgba(232,229,224,0.6)', background: 'rgba(247,245,242,0.3)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#888' }}>{t('orderItems')}</p>
-                    <div className="space-y-2 mb-5">
+                  <div
+                    className="px-4 sm:px-5 py-4 sm:py-5 fade-up"
+                    style={{ borderTop: '1px solid #e8e5e0', background: '#faf9f7' }}
+                  >
+                    {/* Items */}
+                    <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#bbb' }}>
+                      {t('orderItems')}
+                    </p>
+                    <div className="space-y-2.5 mb-5">
                       {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2" style={{ color: '#888' }}>
-                            {item.image && (
+                        <div key={idx} className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {(item as { image?: string }).image ? (
                               <img
-                                src={item.image}
+                                src={(item as { image?: string }).image}
                                 alt={item.name ?? ''}
-                                className="w-7 h-7 rounded-lg object-cover"
+                                className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                                style={{ background: '#f0ede8' }}
                               />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: '#f0ede8' }} />
                             )}
-                            {item.name} <span style={{ color: 'rgba(136,136,136,0.6)' }}>× {item.quantity}</span>
-                            {item.size && <span className="text-xs" style={{ color: 'rgba(136,136,136,0.5)' }}>({item.size})</span>}
+                            <div className="min-w-0">
+                              <p className="text-sm truncate" style={{ color: '#444' }}>{item.name}</p>
+                              {item.size && <p className="text-xs" style={{ color: '#bbb' }}>Size {item.size}</p>}
+                            </div>
+                            <span className="text-xs flex-shrink-0" style={{ color: '#bbb' }}>× {item.quantity}</span>
+                          </div>
+                          <span className="text-sm font-semibold flex-shrink-0" style={{ color: '#1a2f4e' }}>
+                            {item.total_price.toLocaleString()}
                           </span>
-                          <span className="font-semibold" style={{ color: '#1a2f4e' }}>{item.total_price.toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium" style={{ color: '#888' }}>{t('setStatus')}</span>
-                      {STATUS_OPTIONS.filter((st) => st !== order.status).map((st) => (
-                        <button
-                          key={st}
-                          onClick={() => updateMutation.mutate({ id: numericId, status: st })}
-                          disabled={updateMutation.isPending}
-                          className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40"
-                          style={{ border: '1px solid #e8e5e0', background: '#fff', color: '#1a2f4e' }}
-                          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = '#f7f5f2' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}
-                        >
-                          → {st}
-                        </button>
-                      ))}
-                    </div>
+
                   </div>
                 )}
               </div>

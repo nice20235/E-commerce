@@ -169,8 +169,7 @@ if settings.DEBUG and not origin_regex:
 if origin_regex:
     cors_kwargs["allow_origin_regex"] = origin_regex
 
-# Startup log for visibility
-print(f"[CORS] allowed_origins={allowed} regex={origin_regex}")
+logger.debug("[CORS] allowed_origins=%s regex=%s", allowed, origin_regex)
 
 # Performance middleware
 app.add_middleware(PerformanceMiddleware)
@@ -192,13 +191,10 @@ _exclude = {p.strip() for p in settings.RATE_LIMIT_EXCLUDE_PATHS.split(',') if p
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    # Always let CORS preflight pass through quickly
+    # Always let CORS preflight pass through to the CORS middleware which is
+    # registered as the outermost layer and knows how to set the correct headers.
     if request.method == "OPTIONS":
-        # Return minimal OK for preflight if another route/middleware doesn't handle it
-        response = JSONResponse(status_code=200, content={})
-        # When allow_credentials is true, Access-Control-Allow-Origin cannot be '*', so FastAPI's CORS
-        # will set the echo origin. Here we just return early to avoid other middlewares blocking it.
-        return response
+        return await call_next(request)
     path = request.url.path
     if path in _exclude:
         return await call_next(request)
@@ -248,7 +244,7 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content={
             "detail": "Internal server error",
-            "message": str(exc) if os.getenv("DEBUG", "False").lower() == "true" else "Something went wrong"
+            "message": str(exc) if settings.DEBUG else "Something went wrong"
         }
     )
 
@@ -329,8 +325,8 @@ async def health_check() -> HealthCheckResponse:
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
-    host=settings.APP_HOST,
-    port=settings.APP_PORT,
-        reload=True,
-        log_level="info"
-    ) 
+        host=settings.APP_HOST,
+        port=settings.APP_PORT,
+        reload=settings.DEBUG,  # reload=True only in DEBUG mode; always False in production
+        log_level="debug" if settings.DEBUG else "warning",
+    )

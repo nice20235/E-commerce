@@ -137,7 +137,15 @@ class BasicAuthRPCMiddleware(BaseHTTPMiddleware):
             return self._unauthorized_response()
 
         username, password = decoded.split(":", 1)
-        if username != self._username or password != self._password:
+        # Use constant-time comparison to prevent timing-based credential enumeration
+        import hmac as _hmac
+        username_ok = _hmac.compare_digest(
+            username.encode("utf-8"), self._username.encode("utf-8")
+        )
+        password_ok = _hmac.compare_digest(
+            password.encode("utf-8"), self._password.encode("utf-8")
+        )
+        if not (username_ok and password_ok):
             logger.warning("Invalid Basic Auth credentials for /rpc")
             return self._unauthorized_response()
 

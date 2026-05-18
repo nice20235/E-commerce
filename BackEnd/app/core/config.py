@@ -27,17 +27,17 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 1  # Reduced from 7 to 1 day  
     SESSION_MAX_DAYS: int = 1  # Absolute maximum session lifetime (sliding disabled past this). 0 disables hard cap.
     SESSION_MAX_HOURS: int = 8  # Alternative to DAYS. If >0, hours takes precedence. Reduced from 12 to 8.
+    # Safe development-only defaults. In production, override ALLOWED_ORIGINS and
+    # ALLOWED_ORIGIN_REGEX via environment variables to list only your real domains.
     ALLOWED_ORIGINS: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
-        "http://localhost:5173,"
-        "https://oyoqkiyim.duckdns.org,"
-        "https://optomoyoqkiyim.uz,"
-        "https://www.optomoyoqkiyim.uz,"
-        "https://step-up-7.vercel.app"
+        "http://localhost:5173"
     )
-    # Allow any subdomain on production domain by default (www, ru., uz., etc.)
-    ALLOWED_ORIGIN_REGEX: str | None = r"^https?://(.+\.)?optomoyoqkiyim\.uz$"
+    # Production regex for subdomain matching. Set via env ALLOWED_ORIGIN_REGEX.
+    # Example: r"^https://(.+\.)?yourdomain\.com$"
+    # Defaults to None so that no wildcard regex is active unless explicitly configured.
+    ALLOWED_ORIGIN_REGEX: str | None = None
     LOGIN_RATE_LIMIT: int = 5  # попыток
     LOGIN_RATE_WINDOW_SEC: int = 300  # окно в секундах (5 минут)
     COOKIE_SAMESITE: str = "lax"  # options: 'lax', 'strict', 'none'
@@ -85,3 +85,22 @@ class Settings(BaseSettings):
     ORDER_MAX_QTY_PER_ITEM: int = 1000
 
 settings = Settings()
+
+# Refuse to start in any environment where the secret key is still the
+# development placeholder. This prevents accidental production deployments
+# with a publicly-known JWT signing key.
+_UNSAFE_DEFAULTS = {
+    "CHANGE_ME_DEVELOPMENT_SECRET_KEY",
+    "changeme",
+    "secret",
+    "",
+}
+if settings.SECRET_KEY.get_secret_value() in _UNSAFE_DEFAULTS:
+    import os as _os
+    if _os.environ.get("ALLOW_WEAK_SECRET") != "1":
+        raise RuntimeError(
+            "SECRET_KEY is set to an unsafe development placeholder. "
+            "Set a strong SECRET_KEY environment variable before starting "
+            "the application. To suppress this check in local development "
+            "only, set ALLOW_WEAK_SECRET=1."
+        )

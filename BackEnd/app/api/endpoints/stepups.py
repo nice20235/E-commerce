@@ -9,6 +9,7 @@ import logging
 from app.db.database import get_db
 from app.auth.dependencies import get_current_admin
 from app.core.cache import cached, invalidate_cache_pattern
+from app.core.config import settings
 from app.crud.stepup import (
     get_slipper,
     get_slippers,
@@ -251,7 +252,6 @@ async def upload_slipper_images(
     current_admin: dict = Depends(get_current_admin),
 ):
     """Upload one or many images for a stepup. First image becomes main image if not set."""
-    from app.models.stepup import StepUpImage
     slipper = await get_slipper(db, slipper_id=slipper_id)
     if not slipper:
         raise HTTPException(status_code=404, detail="StepUp not found")
@@ -266,21 +266,50 @@ async def upload_slipper_images(
     await asyncio.to_thread(os.makedirs, upload_dir, exist_ok=True)
 
     for i, image in enumerate(images):
-        ext = os.path.splitext(image.filename)[1]
-        # SVG is intentionally excluded: SVG files can embed <script> tags and
-        # are served as static files, which creates a stored XSS vector.
-        if ext.lower() not in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
-            raise HTTPException(status_code=400, detail=f"Invalid image format for file {image.filename}. Allowed: jpg, jpeg, png, webp, gif")
-
-        filename = f"{uuid4().hex}{ext}"
-        file_path = os.path.join(upload_dir, filename)
         data = await image.read()
-        from app.core.config import settings as _cfg
-        if len(data) > _cfg.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+
+        # Size check must come before magic-byte inspection so we don't read
+        # an unbounded payload into memory first.
+        if len(data) > settings.MAX_IMAGE_SIZE_MB * 1024 * 1024:
             raise HTTPException(
                 status_code=400,
-                detail=f"File {image.filename} exceeds the {_cfg.MAX_IMAGE_SIZE_MB} MB size limit",
+                detail=f"File exceeds the {settings.MAX_IMAGE_SIZE_MB} MB size limit",
             )
+
+        # Validate file type by inspecting magic bytes, NOT the client-supplied
+        # filename extension. The filename is fully attacker-controlled and must
+        # never be trusted for security decisions.
+        #
+        # Magic byte signatures:
+        #   JPEG  : FF D8 FF
+        #   PNG   : 89 50 4E 47 0D 0A 1A 0A
+        #   GIF   : 47 49 46 38
+        #   WEBP  : 52 49 46 46 ... 57 45 42 50  (bytes 0-3 and 8-11)
+        _MAGIC = {
+            b"\xff\xd8\xff": ".jpg",
+            b"\x89PNG\r\n\x1a\n": ".png",
+            b"GIF8": ".gif",
+        }
+        detected_ext: str | None = None
+        for magic, ext_candidate in _MAGIC.items():
+            if data[:len(magic)] == magic:
+                detected_ext = ext_candidate
+                break
+        # WEBP: starts with RIFF and has WEBP at offset 8
+        if detected_ext is None and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            detected_ext = ".webp"
+
+        if detected_ext is None:
+            # SVG is intentionally excluded: SVG can embed <script> tags and
+            # would be served as a static file, creating a stored XSS vector.
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image format. Allowed: jpg, jpeg, png, webp, gif",
+            )
+
+        filename = f"{uuid4().hex}{detected_ext}"
+        file_path = os.path.join(upload_dir, filename)
+
         def _write_bytes(path, data_bytes):
             with open(path, "wb") as f:
                 f.write(data_bytes)

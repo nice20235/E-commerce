@@ -31,7 +31,12 @@ client.interceptors.response.use(
         // New access_token cookie is set — retry original request with it automatically
         return client(original)
       } catch {
+        // Clear both localStorage and the Zustand store so the UI reflects the
+        // logged-out state immediately and does not keep retrying.
         localStorage.removeItem('user')
+        // Dynamically import to avoid a circular dependency at module init time.
+        const { useAuthStore } = await import('../store/auth')
+        useAuthStore.getState().clearAuth()
         window.location.href = '/login'
       }
     }

@@ -30,7 +30,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         const user = JSON.parse(userStr) as User
         set({ user, isAuthenticated: true })
       } catch {
-        localStorage.clear()
+        // Only remove the corrupted auth entry, not all browser storage.
+        localStorage.removeItem('user')
       }
     }
   },

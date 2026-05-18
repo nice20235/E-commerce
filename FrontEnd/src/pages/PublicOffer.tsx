@@ -4,7 +4,7 @@ const content = {
   uz: {
     title: 'Ommaviy oferta',
     updated: 'Yangilangan: 12.03.2026',
-    intro1: 'Ushbu ommaviy oferta (keyingi o\'rinlarda — «Oferta») <strong>StepUp</strong> (keyingi o\'rinlarda — «Sotuvchi») tomonidan jismoniy shaxsga (keyingi o\'rinlarda — «Xaridor») quyida bayon etilgan shartlarda tovarlar sotib olish / xizmatlar ko\'rsatish shartnomasini tuzish to\'g\'risidagi rasmiy taklifdir.',
+    intro1: "Ushbu ommaviy oferta (keyingi o'rinlarda — «Oferta») StepUp (keyingi o'rinlarda — «Sotuvchi») tomonidan jismoniy shaxsga (keyingi o'rinlarda — «Xaridor») quyida bayon etilgan shartlarda tovarlar sotib olish / xizmatlar ko'rsatish shartnomasini tuzish to'g'risidagi rasmiy taklifdir.",
     intro2: 'Buyurtmani amalga oshirish va uni to\'lash Xaridorning ushbu Oferta shartlariga roziligini anglatadi.',
     sections: [
       {
@@ -56,7 +56,7 @@ const content = {
   ru: {
     title: 'Публичная оферта',
     updated: 'Обновлено: 12.03.2026',
-    intro1: 'Настоящая публичная оферта (далее — «Оферта») является официальным предложением <strong>StepUp</strong> (далее — «Продавец») любому физическому лицу (далее — «Покупатель») заключить договор купли-продажи товаров / оказания услуг на условиях, изложенных ниже.',
+    intro1: 'Настоящая публичная оферта (далее — «Оферта») является официальным предложением StepUp (далее — «Продавец») любому физическому лицу (далее — «Покупатель») заключить договор купли-продажи товаров / оказания услуг на условиях, изложенных ниже.',
     intro2: 'Осуществление заказа и его оплата означает согласие Покупателя с условиями данной Оферты.',
     sections: [
       {
@@ -107,56 +107,128 @@ const content = {
   },
 }
 
+const SECTION_ICONS = [
+  <svg key="pay" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
+  <svg key="ret" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
+  <svg key="del" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
+  <svg key="sec" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  <svg key="priv" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+]
+
 export default function PublicOffer() {
   const { lang } = useLang()
   const c = content[lang]
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="rounded-3xl p-8 sm:p-10" style={{ background: '#fff', boxShadow: '0 2px 24px rgba(0,0,0,0.07)' }}>
-        <h1 className="text-2xl font-black mb-1" style={{ color: '#1a2f4e' }}>{c.title}</h1>
-        <p className="text-sm mb-8" style={{ color: '#888' }}>{c.updated}</p>
-
-        <p className="text-sm leading-relaxed mb-4" style={{ color: '#444' }}
-          dangerouslySetInnerHTML={{ __html: c.intro1 }} />
-        <p className="text-sm leading-relaxed mb-8" style={{ color: '#444' }}>{c.intro2}</p>
-
-        {c.sections.map((section) => (
-          <div key={section.title} className="mb-7">
-            <h2 className="font-bold mb-3" style={{ color: '#1a2f4e', fontSize: 15 }}>{section.title}</h2>
-            <ul className="space-y-2">
-              {section.items.map((item, i) => (
-                <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: '#444' }}>
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ff4d1c' }} />
-                  {item}
-                </li>
-              ))}
-            </ul>
+      {/* Header banner */}
+      <div
+        className="rounded-2xl sm:rounded-3xl px-5 sm:px-8 py-8 sm:py-10 mb-4 sm:mb-6 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #1a2f4e 0%, #0f1e33 100%)' }}
+      >
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,77,28,0.12)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div className="relative">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,77,28,0.15)', border: '1px solid rgba(255,77,28,0.2)' }}>
+            <svg className="w-5 h-5" style={{ color: '#ff7a50' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
-        ))}
+          <h1 className="text-xl sm:text-2xl font-black text-white mb-1">{c.title}</h1>
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{c.updated}</p>
+        </div>
+      </div>
 
-        <div className="rounded-2xl p-5 mt-8" style={{ background: '#f7f5f2', border: '1px solid #e8e5e0' }}>
-          <h2 className="font-bold mb-3" style={{ color: '#1a2f4e', fontSize: 15 }}>{c.reqTitle}</h2>
-          <div className="space-y-1.5 text-sm" style={{ color: '#555' }}>
-            <p><strong>StepUp</strong></p>
-            <p>ИНН: 552430231</p>
-            <p>
-              {lang === 'uz' ? 'Yuridik manzil' : 'Юридический адрес'}:{' '}
+      {/* Content card */}
+      <div className="rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-10" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.07)' }}>
+        {/* Intro */}
+        <div className="mb-7 sm:mb-10 pb-6 sm:pb-8" style={{ borderBottom: '1px solid #e8e5e0' }}>
+          <p className="text-sm leading-relaxed mb-3" style={{ color: '#444' }}>{c.intro1}</p>
+          <p className="text-sm leading-relaxed" style={{ color: '#444' }}>{c.intro2}</p>
+        </div>
+
+        {/* Sections */}
+        <div className="space-y-6 sm:space-y-8">
+          {c.sections.map((section, idx) => (
+            <div key={section.title}>
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: 'rgba(255,77,28,0.08)', color: '#ff6a3c' }}
+                >
+                  {SECTION_ICONS[idx]}
+                </div>
+                <h2 className="font-bold text-sm leading-snug" style={{ color: '#1a2f4e' }}>{section.title}</h2>
+              </div>
+              <ul className="space-y-2.5 ml-11">
+                {section.items.map((item, i) => (
+                  <li key={i} className="flex gap-3 text-sm leading-relaxed" style={{ color: '#555' }}>
+                    <span
+                      className="mt-2 rounded-full flex-shrink-0"
+                      style={{ background: '#ff4d1c', minWidth: 6, width: 6, height: 6 }}
+                    />
+                    <span className="break-words">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Requisites */}
+        <div
+          className="rounded-2xl p-4 sm:p-6 mt-8 sm:mt-10"
+          style={{ background: '#faf9f7', border: '1px solid #e8e5e0' }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,77,28,0.08)', color: '#ff6a3c' }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h2 className="font-bold text-sm" style={{ color: '#1a2f4e' }}>{c.reqTitle}</h2>
+          </div>
+          <div className="ml-11 space-y-2 text-sm" style={{ color: '#555' }}>
+            <p className="font-bold" style={{ color: '#1a2f4e' }}>StepUp</p>
+            <p style={{ color: '#888' }}>ИНН: 552430231</p>
+            <p className="break-words">
+              <span style={{ color: '#888' }}>{lang === 'uz' ? 'Yuridik manzil' : 'Юридический адрес'}:</span>{' '}
+              Ташкентский об, Эшонгузар, ул. Х. Нигмон
+            </p>
+            <p className="break-words">
+              <span style={{ color: '#888' }}>{lang === 'uz' ? 'Haqiqiy manzil' : 'Фактический адрес'}:</span>{' '}
               Ташкентский об, Эшонгузар, ул. Х. Нигмон
             </p>
             <p>
-              {lang === 'uz' ? 'Haqiqiy manzil' : 'Фактический адрес'}:{' '}
-              Ташкентский об, Эшонгузар, ул. Х. Нигмон
+              <span style={{ color: '#888' }}>{lang === 'uz' ? 'Telefon' : 'Телефон'}:</span>{' '}
+              <a href="tel:+998930919454" className="font-medium transition-colors" style={{ color: '#ff4d1c' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#e03c10')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#ff4d1c')}
+              >
+                +998 93 091 94 54
+              </a>
             </p>
-            <p>
-              {lang === 'uz' ? 'Telefon' : 'Телефон'}:{' '}
-              <a href="tel:+998930919454" style={{ color: '#ff4d1c' }}>+998 93 091 94 54</a>
+            <p className="break-words">
+              E-mail:{' '}
+              <a href="mailto:elbek1987101@icloud.com" className="font-medium transition-colors" style={{ color: '#ff4d1c' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#e03c10')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#ff4d1c')}
+              >
+                elbek1987101@icloud.com
+              </a>
             </p>
-            <p>E-mail: <a href="mailto:elbek1987101@icloud.com" style={{ color: '#ff4d1c' }}>elbek1987101@icloud.com</a></p>
           </div>
         </div>
 
-        <p className="mt-8 text-xs leading-relaxed" style={{ color: '#888' }}>{c.closing}</p>
+        {/* Closing note */}
+        <div
+          className="flex items-start gap-3 rounded-2xl p-4 mt-5 sm:mt-6"
+          style={{ background: '#eff6ff', border: '1px solid #dbeafe' }}
+        >
+          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs sm:text-sm leading-relaxed" style={{ color: '#1d4ed8' }}>{c.closing}</p>
+        </div>
       </div>
     </div>
   )

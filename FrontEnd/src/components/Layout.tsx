@@ -10,15 +10,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#f7f5f2' }}>
       <Navbar />
-      <main className="flex-1 max-w-7xl mx-auto w-full px-5 sm:px-8 py-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {children}
       </main>
 
-      <footer style={{ background: 'linear-gradient(135deg, #1a2f4e 0%, #0f1e33 100%)' }} className="mt-20">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-12 pb-8">
+      <footer style={{ background: 'linear-gradient(135deg, #1a2f4e 0%, #0f1e33 100%)' }} className="mt-12 sm:mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-6 sm:pb-8">
 
           {/* Top grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 pb-10" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10 pb-8 sm:pb-10" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
 
             {/* Brand */}
             <div>
@@ -31,7 +31,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <span className="text-white font-extrabold text-base">StepUp</span>
               </div>
-              <p className="text-xs leading-relaxed max-w-[200px]" style={{ color: 'rgba(255,255,255,0.38)' }}>
+              <p className="text-xs leading-relaxed max-w-[260px]" style={{ color: 'rgba(255,255,255,0.38)' }}>
                 {lang === 'uz'
                   ? 'Qulay va chiroyli poyabzal — har bir qadam uchun.'
                   : 'Удобная и стильная обувь — для каждого шага.'}
@@ -40,7 +40,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Navigation */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              <h4 className="text-xs font-bold uppercase tracking-widest mb-4 sm:mb-5" style={{ color: 'rgba(255,255,255,0.25)' }}>
                 {lang === 'uz' ? 'Menyu' : 'Навигация'}
               </h4>
               <nav className="flex flex-col gap-3">
@@ -56,36 +56,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Info */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              <h4 className="text-xs font-bold uppercase tracking-widest mb-4 sm:mb-5" style={{ color: 'rgba(255,255,255,0.25)' }}>
                 {lang === 'uz' ? 'Ma\'lumot' : 'Информация'}
               </h4>
               <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>
                 {lang === 'uz'
-                  ? 'Sifatli mahalliy poyabzal ishlab chiqaruvchi. O\'zbekiston.'
-                  : 'Качественный местный производитель обуви. Узбекистан.'}
+                  ? 'Har kuni qulay va chiroyli oyoq kiyim kiyib yuring. Sifat va qulaylik — bizning ustuvorligimiz.'
+                  : 'Носите удобную и красивую обувь каждый день. Качество и комфорт — наш приоритет.'}
               </p>
-              <div className="flex items-center gap-2 mt-4">
-                <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(255,77,28,0.15)', color: '#ff7a50' }}>
-                  Premium
-                </span>
-                <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)' }}>
-                  Made in UZ
-                </span>
-              </div>
             </div>
           </div>
 
           {/* Bottom row */}
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          <div className="pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-center sm:text-left" style={{ color: 'rgba(255,255,255,0.22)' }}>
               &copy; {new Date().getFullYear()} StepUp. {lang === 'uz' ? 'Barcha huquqlar himoyalangan.' : 'Все права защищены.'}
             </p>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22c55e' }} />
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.22)' }}>
-                {lang === 'uz' ? 'Barcha tizimlar ishlayapti' : 'Все системы работают'}
-              </p>
-            </div>
           </div>
         </div>
       </footer>

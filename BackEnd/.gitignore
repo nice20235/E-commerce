@@ -197,7 +197,8 @@ stepup.db-journal
 .AppleDouble
 .LSOverride
 
-# Local environment & secrets
+# Local environment & secrets — NEVER commit real credentials
+.env
 .env.local
 .env.prod
 .env.backup

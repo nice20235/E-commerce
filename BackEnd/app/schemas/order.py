@@ -92,7 +92,7 @@ class OrderFromCartRequest(BaseModel):
     compare the amount against server-side totals for additional safety.
     """
 
-    cart_id: str = Field(..., description="Public cart identifier, e.g. 'cart_1'")
+    cart_id: str = Field(..., description="Public cart identifier, e.g. 'cart_1'", max_length=64)
     amount: int = Field(..., description="Total cart amount in UZS (integer, no decimals)", gt=0)
 
 class OrderItemPublic(BaseModel):

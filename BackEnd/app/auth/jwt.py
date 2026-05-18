@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from app.core.config import settings
 from typing import Optional, Dict, Any
 
@@ -49,23 +50,27 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None, 
     return encoded_jwt
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and validate JWT access token"""
+    """Decode and validate JWT access token.
+
+    PyJWT rejects the 'none' algorithm by default when algorithms is an
+    explicit list, preventing algorithm-confusion attacks.
+    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "access":
             return None
         return payload
-    except JWTError:
+    except InvalidTokenError:
         return None
 
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and validate JWT refresh token"""
+    """Decode and validate JWT refresh token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             return None
         return payload
-    except JWTError:
+    except InvalidTokenError:
         return None
 
 def verify_token(token: str) -> Optional[Dict[str, Any]]:
@@ -73,5 +78,5 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError:
+    except InvalidTokenError:
         return None

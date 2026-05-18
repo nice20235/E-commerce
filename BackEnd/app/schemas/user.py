@@ -13,12 +13,14 @@ class UserCreate(UserBase):
         ...,
         description="User's password",
         min_length=8,
-        example="securepassword123"
+        max_length=1000,
+        example="securepassword123",
     )
     confirm_password: str = Field(
         ...,
         description="Confirm password",
-        example="securepassword123"
+        max_length=1000,
+        example="securepassword123",
     )
 
     @validator('confirm_password')
@@ -96,14 +98,21 @@ class UserList(BaseModel):
 
 class UserLogin(BaseModel):
     name: str = Field(
-        ..., 
-        description="User's name for login", 
-        example="John"
+        ...,
+        description="User's name for login",
+        min_length=2,
+        max_length=100,
+        example="John",
     )
+    # max_length=1000 prevents bcrypt DoS: passlib/bcrypt silently truncates at
+    # 72 bytes but an unbounded field lets an attacker send megabyte payloads
+    # that exhaust CPU before truncation occurs at the Python layer.
     password: str = Field(
-        ..., 
-        description="User's password", 
-        example="securepassword123"
+        ...,
+        description="User's password",
+        min_length=1,
+        max_length=1000,
+        example="securepassword123",
     )
     
     class Config:
@@ -130,15 +139,17 @@ class ForgotPasswordRequest(BaseModel):
         example="John"
     )
     new_password: str = Field(
-        ..., 
-        description="New password", 
+        ...,
+        description="New password",
         min_length=8,
-        example="newsecurepassword123"
+        max_length=1000,
+        example="newsecurepassword123",
     )
     confirm_new_password: str = Field(
-        ..., 
-        description="Confirm new password", 
-        example="newsecurepassword123"
+        ...,
+        description="Confirm new password",
+        max_length=1000,
+        example="newsecurepassword123",
     )
     
     @validator('confirm_new_password')
@@ -153,9 +164,9 @@ class UserSelfUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=100, example="John")
     surname: Optional[str] = Field(None, min_length=2, max_length=100, example="Doe")
     phone_number: Optional[str] = Field(None, min_length=7, max_length=20, example="+79991234567")
-    current_password: Optional[str] = Field(None, description="Required when changing password", example="oldpassword123")
-    new_password: Optional[str] = Field(None, min_length=8, example="newsecurepassword123")
-    confirm_new_password: Optional[str] = Field(None, example="newsecurepassword123")
+    current_password: Optional[str] = Field(None, max_length=1000, description="Required when changing password", example="oldpassword123")
+    new_password: Optional[str] = Field(None, min_length=8, max_length=1000, example="newsecurepassword123")
+    confirm_new_password: Optional[str] = Field(None, max_length=1000, example="newsecurepassword123")
 
     @validator('phone_number')
     def validate_phone_number(cls, v):

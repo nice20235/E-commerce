@@ -1,13 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.database import get_db
-from app.auth.jwt import create_access_token, create_refresh_token, decode_refresh_token, _calc_session_exp
-from app.crud.user import create_user, get_user_by_name, get_user_by_phone_number, get_user
-from app.schemas.user import UserCreate, UserLogin, UserResponse
+import time
+import logging
+from collections import defaultdict, deque
+from datetime import datetime
 from typing import Optional
 
-import logging
-from datetime import datetime
+from app.db.database import get_db
+from app.auth.jwt import create_access_token, create_refresh_token, decode_refresh_token, _calc_session_exp
+from app.auth.password import verify_password
+from app.crud.user import create_user, get_user_by_name, get_user_by_phone_number, get_user
+from app.schemas.user import UserCreate, UserLogin, UserResponse
+from app.core.config import settings
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
@@ -49,9 +55,7 @@ def _clear_auth_cookies(response: Response) -> None:
             samesite=settings.COOKIE_SAMESITE,
             domain=settings.COOKIE_DOMAIN or None,
         )
-import time
-from collections import defaultdict, deque
-from app.core.config import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -90,76 +94,51 @@ def check_login_rate_limit(name: str, client_ip: str):
 async def register_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
-    response: Response = None
 ):
-    # Check if user with same name already exists
     existing_user_by_name = await get_user_by_name(db, user_data.name)
     if existing_user_by_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this name already exists"
-        )
-    # Check if user with same phone number already exists
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this name already exists")
     existing_user_by_phone = await get_user_by_phone_number(db, user_data.phone_number)
     if existing_user_by_phone:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this phone number already exists"
-        )
-    # Create new user
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this phone number already exists")
     user = await create_user(db, user_data)
     logger.info(f"Created new user: {user.name} ({user.phone_number})")
     now_session_exp = _calc_session_exp(datetime.utcnow())
     access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
-    _set_auth_cookies(response, access_token, refresh_token)
     user_payload = UserResponse.from_orm(user).dict()
     user_payload.pop("id", None)
-    return {"user": user_payload}
+    resp = JSONResponse(content=jsonable_encoder({"user": user_payload}))
+    _set_auth_cookies(resp, access_token, refresh_token)
+    return resp
 
 
 @auth_router.post("/login")
 async def login_user(
     user_credentials: UserLogin,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    response: Response = None,
-    request: Request = None
 ):
-    """
-    Login user with name and password
-    """
-    # Rate-limit by name + client IP
-    client_ip = request.client.host if request and request.client else "unknown"
+    client_ip = request.client.host if request.client else "unknown"
     check_login_rate_limit(user_credentials.name, client_ip)
-    # Authenticate user by name
     user = await get_user_by_name(db, user_credentials.name)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный логин или пароль"
-        )
-    # Verify password
-    from app.auth.password import verify_password
-    if not verify_password(user_credentials.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный логин или пароль"
-        )
+    if not user or not verify_password(user_credentials.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
     now_session_exp = _calc_session_exp(datetime.utcnow())
     access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
-    _set_auth_cookies(response, access_token, refresh_token)
-    logger.info(f"User logged in successfully: {user.name} (ID: {user.id})")
+    logger.info(f"User logged in: {user.name} (ID: {user.id})")
     user_payload = UserResponse.from_orm(user).dict()
     user_payload.pop("id", None)
-    return {"user": user_payload}
+    resp = JSONResponse(content=jsonable_encoder({"user": user_payload}))
+    _set_auth_cookies(resp, access_token, refresh_token)
+    return resp
 
 
 @auth_router.post("/refresh")
 async def refresh_token(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    response: Response = None
 ):
     """
     Refresh access token using refresh token from body or headers
@@ -213,14 +192,15 @@ async def refresh_token(
 
     access_token = create_access_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt)
     refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt)
-    _set_auth_cookies(response, access_token, refresh_token)
     logger.info(f"Token refreshed for user: {user.name} (ID: {user.id})")
     user_payload = UserResponse.from_orm(user).dict()
     user_payload.pop("id", None)
-    return {"user": user_payload}
+    resp = JSONResponse(content=jsonable_encoder({"user": user_payload}))
+    _set_auth_cookies(resp, access_token, refresh_token)
+    return resp
 
 @auth_router.post("/logout")
-async def logout(request: Request, response: Response):
+async def logout(request: Request):
     """Logout: clear HttpOnly cookies and invalidate in-memory cache for this user."""
     try:
         from app.auth.jwt import decode_access_token
@@ -236,8 +216,9 @@ async def logout(request: Request, response: Response):
     except Exception as e:
         logger.warning(f"Logout cache cleanup error: {e}")
 
-    _clear_auth_cookies(response)
-    return {"message": "Logged out successfully"}
+    resp = JSONResponse(content={"message": "Logged out successfully"})
+    _clear_auth_cookies(resp)
+    return resp
 
 
 @auth_router.post("/forgot-password")
