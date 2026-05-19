@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCart, updateCartItem, removeCartItem, clearCart } from '../api/cart'
 import { useLang } from '../store/lang'
+import { getImageUrl } from '../utils/image'
 
 export default function Cart() {
   const navigate = useNavigate()
@@ -127,7 +128,7 @@ export default function Cart() {
                 {/* Image */}
                 <Link to={`/products/${item.product_id}`} className="flex-shrink-0 rounded-xl overflow-hidden block" style={{ background: '#f0ede8', width: 64, height: 64 }}>
                   {item.image
-                    ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    ? <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                     : (
                       <div className="w-full h-full flex items-center justify-center">
                         <svg className="w-7 h-7" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
