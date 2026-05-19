@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
@@ -15,11 +15,13 @@ from app.crud.order import (
     update_order,
     delete_order,
 )
+from app.crud.cart import get_cart, get_cart_totals, clear_cart as clear_cart_fn
 from app.models.order import OrderItem
 from app.models.stepup import StepUp
+from app.models.user import User as _User
 from app.core.timezone import format_tashkent_compact
 from app.auth.dependencies import get_current_user, get_current_admin
-from app.core.cache import cached, invalidate_cache_pattern
+from app.core.cache import cache as _cache, invalidate_cache_pattern
 import logging
 
 # Set up logging
@@ -41,8 +43,6 @@ async def create_order_from_cart(
       automatically clears the cart for this user so items are not duplicated
       on the next order.
     """
-    from app.crud.cart import get_cart, get_cart_totals, clear_cart as clear_cart_fn
-
     # Basic validation of client-provided amount (integer UZS)
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -82,11 +82,20 @@ async def create_order_from_cart(
         )
 
     # Build items from cart lines; unit_price is determined from DB at creation time
+    # Validate that all cart items still have a loaded product (could be deleted between
+    # cart load and order creation). Raise early rather than silently using 0.0 price.
+    missing = [ci.slipper_id for ci in cart.items if ci.slipper is None]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"One or more products in cart no longer exist: {missing}",
+        )
+
     items_source: list[OrderItemCreate] = [
         OrderItemCreate(
             slipper_id=ci.slipper_id,
             quantity=ci.quantity,
-            unit_price=float(ci.slipper.price) if ci.slipper else 0.0,
+            unit_price=float(ci.slipper.price),
             notes=None,
         )
         for ci in cart.items
@@ -163,8 +172,6 @@ async def list_orders(
     - Admin: all users' orders.
     Pagination & status filtering removed per request.
     """
-    from app.core.cache import cache as _cache
-
     # Build a per-user cache key that includes only the user id and role so
     # that (a) different users never share a cache entry, and (b) sensitive
     # fields (password_hash) are never embedded in a cache key.
@@ -186,7 +193,6 @@ async def list_orders(
         user_ids = list({o.user_id for o in orders})
         users_by_id: dict[int, tuple[str, str]] = {}
         if user_ids:
-            from app.models.user import User as _User
             user_rows = await db.execute(select(_User.id, _User.name, _User.surname).where(_User.id.in_(user_ids)))
             for uid, nm, sn in user_rows.all():
                 users_by_id[int(uid)] = (nm, sn)

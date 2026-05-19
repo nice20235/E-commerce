@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.order import Order
 from app.services.acquiring import AcquiringClient
 from app.auth.dependencies import get_current_user
 from app.db.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(prefix="/payment", tags=["Payment"])
@@ -29,8 +31,6 @@ async def init_payment(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="amount must be positive")
 
-    from sqlalchemy import select
-    from app.models.order import Order
     result = await db.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order:

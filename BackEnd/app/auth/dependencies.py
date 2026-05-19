@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import Depends, HTTPException, status, Request
 from jwt.exceptions import InvalidTokenError as JWTError
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ from app.auth.jwt import decode_access_token
 from app.models.user import User
 from app.crud.user import get_user
 from app.core.cache import cache
+from app.core.config import settings as _settings
 import logging
 
 # Set up logging
@@ -63,7 +65,6 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         # Check session expiration if present
         sess_exp_ts = payload.get("sess_exp")
         if sess_exp_ts:
-            from datetime import datetime
             sess_exp_dt = datetime.utcfromtimestamp(int(sess_exp_ts))
             if datetime.utcnow() >= sess_exp_dt:
                 logger.warning("Session expired, forcing re-login")
@@ -106,7 +107,6 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
             is_admin=db_user.is_admin,
         )
 
-        from app.core.config import settings as _settings
         await cache.set(cache_key, user_ctx, ttl=_settings.USER_CACHE_TTL_SEC)
 
         logger.info(f"User authenticated successfully: {user_ctx.name} (ID: {user_ctx.id})")

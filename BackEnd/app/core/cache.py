@@ -58,12 +58,9 @@ class SimpleAsyncCache:
                 del self._cache[key]
     
     async def clear_pattern(self, pattern: str) -> None:
-        """Clear cache entries matching pattern"""
+        """Clear cache entries whose key contains the given substring."""
         async with self._lock:
-            keys_to_delete = []
-            for key in self._cache.keys():
-                if pattern.replace('*', '') in key:
-                    keys_to_delete.append(key)
+            keys_to_delete = [key for key in self._cache if pattern in key]
             for key in keys_to_delete:
                 del self._cache[key]
 

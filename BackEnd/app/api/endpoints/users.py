@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from app.db.database import get_db
 from app.schemas.user import UserUpdate, UserSelfUpdate, UserProfileResponse
@@ -11,7 +12,7 @@ from app.crud.user import (
     update_user,
     update_user_password,
 )
-from sqlalchemy.exc import IntegrityError
+from app.auth.password import verify_password
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.core.cache import cached, invalidate_cache_pattern
 import logging
@@ -196,7 +197,6 @@ async def update_own_profile(
     """
     # Handle optional password change (load from DB to get hash — never store hash in CurrentUser)
     if user_update.new_password is not None:
-        from app.auth.password import verify_password
         fresh_user = await get_user(db, current_user.id)
         if not fresh_user or not verify_password(user_update.current_password or "", fresh_user.password_hash):
             raise HTTPException(status_code=400, detail="Current password is incorrect")

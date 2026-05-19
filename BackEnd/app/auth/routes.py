@@ -9,11 +9,12 @@ from datetime import datetime
 from typing import Optional
 
 from app.db.database import get_db
-from app.auth.jwt import create_access_token, create_refresh_token, decode_refresh_token, _calc_session_exp
+from app.auth.jwt import create_access_token, create_refresh_token, decode_access_token, decode_refresh_token, _calc_session_exp
 from app.auth.password import verify_password
 from app.crud.user import create_user, get_user_by_name, get_user_by_phone_number, get_user
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.core.config import settings
+from app.core.cache import cache, invalidate_cache_pattern
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
@@ -203,8 +204,6 @@ async def refresh_token(
 async def logout(request: Request):
     """Logout: clear HttpOnly cookies and invalidate in-memory cache for this user."""
     try:
-        from app.auth.jwt import decode_access_token
-        from app.core.cache import cache, invalidate_cache_pattern
         token = request.cookies.get("access_token")
         if token:
             payload = decode_access_token(token)

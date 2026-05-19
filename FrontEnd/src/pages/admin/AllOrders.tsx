@@ -33,7 +33,7 @@ export default function AllOrders() {
   const { t, lang } = useLang()
 
   const { data: orders, isLoading, isError } = useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', 'admin'],
     queryFn: getOrders,
     staleTime: 15_000,
   })
@@ -230,7 +230,7 @@ export default function AllOrders() {
                     </p>
                     <div className="space-y-2.5 mb-5">
                       {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-3">
+                        <div key={`${item.slipper_id}-${idx}`} className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
                             {(item as { image?: string }).image ? (
                               <img

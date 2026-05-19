@@ -154,7 +154,7 @@ export default function Checkout() {
 
         <div className="space-y-3 mb-4 sm:mb-5">
           {cart.items.map((item) => (
-            <div key={item.product_id} className="flex items-center justify-between gap-3">
+            <div key={item.cart_item_id} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f0ede8' }}>
                   {(item as { image?: string }).image ? (

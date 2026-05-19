@@ -29,6 +29,7 @@ from app.core.middleware import (
 )
 from app.core.cache import cache
 from app.db.database import init_db, close_db, AsyncSessionLocal
+from sqlalchemy import text as _text
 from app.api.endpoints import users, stepups, orders
 from app.api import rpc as rpc_api
 from app.api.endpoints import cart as cart_router
@@ -293,12 +294,9 @@ async def health_check() -> HealthCheckResponse:
     in-memory cache (set + get a sentinel key) so that load-balancers and
     monitoring tools receive an accurate signal.
     """
-    from sqlalchemy import text as _text
-    from app.db.database import AsyncSessionLocal as _SessionLocal
-
     db_ok = False
     try:
-        async with _SessionLocal() as _db:
+        async with AsyncSessionLocal() as _db:
             await _db.execute(_text("SELECT 1"))
         db_ok = True
     except Exception:

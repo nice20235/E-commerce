@@ -401,13 +401,20 @@ async def delete_slipper_image(
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
+        static_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../../static")
+        )
+        # Resolve the file path and verify it stays inside the static directory
+        # to prevent any path-traversal attack via a manipulated image_path DB value.
         file_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "../../", image.image_path.lstrip("/"))
         )
-        # Check and remove file off the event loop
-        exists = await asyncio.to_thread(os.path.exists, file_path)
-        if exists:
-            await asyncio.to_thread(os.remove, file_path)
+        if not file_path.startswith(static_root + os.sep) and file_path != static_root:
+            logger.warning(f"Refusing to delete file outside static dir: {file_path}")
+        else:
+            exists = await asyncio.to_thread(os.path.exists, file_path)
+            if exists:
+                await asyncio.to_thread(os.remove, file_path)
     except Exception as e:
         logger.warning(f"Failed to delete physical file {image.image_path}: {e}")
 
