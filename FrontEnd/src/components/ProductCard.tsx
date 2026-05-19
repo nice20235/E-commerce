@@ -1,3 +1,4 @@
+import { memo, useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { addToCart } from '../api/cart'
@@ -7,24 +8,29 @@ import type { Product } from '../types'
 import { useLang } from '../store/lang'
 import { getImageUrl } from '../utils/image'
 
-export default function ProductCard({ product }: { product: Product }) {
+function ProductCardInner({ product }: { product: Product }) {
   const { isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { t } = useLang()
+  const [added, setAdded] = useState(false)
 
   const addMutation = useMutation({
     mutationFn: () => addToCart(product.id, 1),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] })
+      setAdded(true)
+      setTimeout(() => setAdded(false), 2000)
+    },
   })
 
-  const handleAdd = (e: React.MouseEvent) => {
+  const handleAdd = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!isAuthenticated) { navigate('/login'); return }
     if (!product.is_available) return
     addMutation.mutate()
-  }
+  }, [isAuthenticated, navigate, product.is_available, addMutation])
 
   const stockLow = product.quantity > 0 && product.quantity <= 5
 
@@ -47,6 +53,9 @@ export default function ProductCard({ product }: { product: Product }) {
             src={getImageUrl(product.image)}
             alt={product.name}
             loading="lazy"
+            decoding="async"
+            width={400}
+            height={400}
             className="card-img w-full h-full object-cover"
           />
         ) : (
@@ -94,10 +103,10 @@ export default function ProductCard({ product }: { product: Product }) {
                 disabled={addMutation.isPending}
                 className="w-full text-white text-xs font-bold py-2.5 rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
                 style={{
-                  background: addMutation.isSuccess
+                  background: added
                     ? 'linear-gradient(135deg, #22c55e, #16a34a)'
                     : 'linear-gradient(135deg, #ff4d1c, #ff6a3c)',
-                  boxShadow: addMutation.isSuccess
+                  boxShadow: added
                     ? '0 4px 14px rgba(34,197,94,0.45)'
                     : '0 4px 14px rgba(255,77,28,0.45)',
                 }}
@@ -109,7 +118,7 @@ export default function ProductCard({ product }: { product: Product }) {
                     </svg>
                     {t('adding')}
                   </>
-                ) : addMutation.isSuccess ? (
+                ) : added ? (
                   <>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -139,7 +148,7 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.name}
         </h3>
 
-        <p className="text-[11px] sm:text-xs mb-2 sm:mb-3" style={{ color: '#bbb' }}>
+        <p className="text-xs mb-2 sm:mb-3" style={{ color: '#bbb' }}>
           {t('size')} {product.size}
         </p>
 
@@ -164,12 +173,12 @@ export default function ProductCard({ product }: { product: Product }) {
             onClick={handleAdd}
             disabled={addMutation.isPending}
             aria-label={`${t('addToCart')}: ${product.name}`}
-            className="sm:hidden w-full mt-2.5 text-white text-[11px] font-bold py-3 rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
+            className="sm:hidden w-full mt-2.5 text-white text-xs font-bold py-3 rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
             style={{
-              background: addMutation.isSuccess
+              background: added
                 ? 'linear-gradient(135deg, #22c55e, #16a34a)'
                 : 'linear-gradient(135deg, #ff4d1c, #ff6a3c)',
-              boxShadow: addMutation.isSuccess
+              boxShadow: added
                 ? '0 2px 8px rgba(34,197,94,0.3)'
                 : '0 2px 8px rgba(255,77,28,0.3)',
               minHeight: 44,
@@ -182,7 +191,7 @@ export default function ProductCard({ product }: { product: Product }) {
                 </svg>
                 {t('adding')}
               </>
-            ) : addMutation.isSuccess ? (
+            ) : added ? (
               <>
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -203,3 +212,6 @@ export default function ProductCard({ product }: { product: Product }) {
     </Link>
   )
 }
+
+const ProductCard = memo(ProductCardInner)
+export default ProductCard

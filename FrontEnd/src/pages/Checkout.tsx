@@ -16,7 +16,7 @@ export default function Checkout() {
   const [error, setError] = useState('')
   const { t } = useLang()
 
-  const { data, isLoading } = useQuery({ queryKey: ['cart'], queryFn: getCart })
+  const { data, isLoading, isError: isCartError } = useQuery({ queryKey: ['cart'], queryFn: getCart, staleTime: 30_000 })
 
   const orderMutation = useMutation({
     mutationFn: () => {
@@ -34,6 +34,20 @@ export default function Checkout() {
   })
 
   const cart = data?.data
+
+  if (isCartError) {
+    return (
+      <div className="max-w-sm mx-auto text-center py-20 px-4">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#fef2f2' }}>
+          <svg className="w-8 h-8" style={{ color: '#fca5a5' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="font-bold mb-1" style={{ color: '#1a2f4e' }}>{t('loadError')}</p>
+        <p className="text-sm" style={{ color: '#888' }}>{t('loadErrorSub')}</p>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -162,7 +176,7 @@ export default function Checkout() {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f0ede8' }}>
                   {item.image ? (
-                    <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={getImageUrl(item.image)} alt={item.name} loading="lazy" decoding="async" width={36} height={36} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <svg className="w-4 h-4" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

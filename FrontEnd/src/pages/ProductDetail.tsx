@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProduct } from '../api/products'
@@ -21,6 +21,7 @@ export default function ProductDetail() {
     queryKey: ['product', id],
     queryFn: () => getProduct(Number(id), true),
     enabled: !!id,
+    staleTime: 120_000,
   })
 
   const addMutation = useMutation({
@@ -39,10 +40,10 @@ export default function ProductDetail() {
     },
   })
 
-  const handleAddToCart = () => {
+  const handleAddToCart = useCallback(() => {
     if (!isAuthenticated) { navigate('/login'); return }
     addMutation.mutate()
-  }
+  }, [isAuthenticated, navigate, addMutation])
 
   if (isLoading) {
     return (
@@ -129,6 +130,9 @@ export default function ProductDetail() {
               <img
                 src={currentImage}
                 alt={product.name}
+                decoding="async"
+                width={600}
+                height={600}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
@@ -170,7 +174,7 @@ export default function ProductDetail() {
                   onMouseEnter={e => { if (i !== selectedImage) e.currentTarget.style.opacity = '0.85' }}
                   onMouseLeave={e => { if (i !== selectedImage) e.currentTarget.style.opacity = '0.55' }}
                 >
-                  <img src={img} alt={`${product.name} – ${i + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`${product.name} – ${i + 1}`} loading="lazy" decoding="async" width={60} height={60} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

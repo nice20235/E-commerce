@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
 from app.models.cart import Cart, CartItem
 from app.models.stepup import StepUp
@@ -115,8 +115,8 @@ async def remove_item(db: AsyncSession, user_id: int, cart_item_id: int) -> Cart
 
 async def clear_cart(db: AsyncSession, user_id: int) -> Cart:
     cart = await get_or_create_cart(db, user_id)
-    for ci in list(cart.items):
-        await db.delete(ci)
+    # Single bulk DELETE instead of N individual deletes
+    await db.execute(sa_delete(CartItem).where(CartItem.cart_id == cart.id))
     await db.commit()
     return await _reload_cart(db, cart.id)
 

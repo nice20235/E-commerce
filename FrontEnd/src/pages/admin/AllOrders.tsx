@@ -237,6 +237,10 @@ export default function AllOrders() {
                               <img
                                 src={getImageUrl(item.image)}
                                 alt={item.name ?? ''}
+                                loading="lazy"
+                                decoding="async"
+                                width={32}
+                                height={32}
                                 className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
                                 style={{ background: '#f0ede8' }}
                               />

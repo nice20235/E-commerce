@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -188,24 +189,27 @@ async def list_orders(
             logger.info(f"User {user.name} listing OWN orders")
             orders, total = await get_orders(db, skip=0, limit=1000, user_id=user.id, load_relationships=False)
 
-        # Batch load users and items for these orders to avoid N+1
+        # Batch load users and items for these orders concurrently to avoid N+1
         order_ids = [o.id for o in orders]
         user_ids = list({o.user_id for o in orders})
-        users_by_id: dict[int, tuple[str, str]] = {}
-        if user_ids:
-            user_rows = await db.execute(select(_User.id, _User.name, _User.surname).where(_User.id.in_(user_ids)))
-            for uid, nm, sn in user_rows.all():
-                users_by_id[int(uid)] = (nm, sn)
 
-        items_by_order: dict[int, list[dict]] = {}
-        if order_ids:
-            data = await db.execute(
+        async def _fetch_users():
+            if not user_ids:
+                return {}
+            rows = await db.execute(select(_User.id, _User.name, _User.surname).where(_User.id.in_(user_ids)))
+            return {int(uid): (nm, sn) for uid, nm, sn in rows.all()}
+
+        async def _fetch_items():
+            if not order_ids:
+                return {}
+            result = await db.execute(
                 select(OrderItem, StepUp)
                 .join(StepUp, StepUp.id == OrderItem.slipper_id)
                 .where(OrderItem.order_id.in_(order_ids))
             )
-            for oi, sl in data.all():
-                items_by_order.setdefault(oi.order_id, []).append({
+            by_order: dict[int, list[dict]] = {}
+            for oi, sl in result.all():
+                by_order.setdefault(oi.order_id, []).append({
                     "slipper_id": oi.slipper_id,
                     "quantity": oi.quantity,
                     "unit_price": oi.unit_price,
@@ -214,6 +218,9 @@ async def list_orders(
                     "size": getattr(sl, "size", None),
                     "image": getattr(sl, "image", None),
                 })
+            return by_order
+
+        users_by_id, items_by_order = await asyncio.gather(_fetch_users(), _fetch_items())
 
         result = [
             {

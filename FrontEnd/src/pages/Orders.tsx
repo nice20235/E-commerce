@@ -143,6 +143,10 @@ export default function Orders() {
                           <img
                             src={getImageUrl(item.image)}
                             alt={item.name ?? ''}
+                            loading="lazy"
+                            decoding="async"
+                            width={28}
+                            height={28}
                             className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
                             style={{ background: '#f0ede8' }}
                           />

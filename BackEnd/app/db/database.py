@@ -77,6 +77,9 @@ async def init_db():
         from app.models.cart import Cart, CartItem  # noqa: F401
         from app.models.transaction import Transaction  # noqa: F401
         
+        # Enable pg_trgm for GIN-accelerated ILIKE searches on product names
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+
         # Create all tables (indexes are automatically created from model definitions)
         await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ Database tables and indexes created successfully!")

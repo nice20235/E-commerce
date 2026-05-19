@@ -7,6 +7,7 @@ from app.models.stepup import StepUp
 from app.schemas.order import OrderCreate, OrderUpdate, OrderItemCreate
 from app.core.cache import invalidate_cache_pattern
 from typing import Optional, List, Tuple
+import asyncio
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -65,20 +66,24 @@ async def get_orders(
     # Count on the plain filtered query *before* adding eager-load options so
     # that joinedload joins don't multiply rows and inflate the total.
     count_query = select(func.count()).select_from(query.subquery())
-    count_result = await db.execute(count_query)
-    total = count_result.scalar() or 0
 
-    # Add relationships after the count
+    # Add relationships to the data query (count must stay clean)
+    data_query = query.offset(skip).limit(limit)
     if load_relationships:
-        query = query.options(
+        data_query = data_query.options(
             joinedload(Order.user),
             selectinload(Order.items).selectinload(OrderItem.slipper)
         )
 
-    data_result = await db.execute(query.offset(skip).limit(limit))
+    # Execute count and data concurrently
+    count_result, data_result = await asyncio.gather(
+        db.execute(count_query),
+        db.execute(data_query),
+    )
+    total = count_result.scalar() or 0
     # Ensure uniqueness when eager loaders are involved
     orders = data_result.unique().scalars().all()
-    
+
     return orders, total
 
 

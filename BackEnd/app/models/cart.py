@@ -22,6 +22,8 @@ class Cart(Base):
     __table_args__ = (
         Index("idx_carts_user", "user_id"),
         Index("idx_carts_created", "created_at"),
+        # Unique cart per user — enforced at application level but index aids fast lookup
+        Index("idx_carts_user_id_asc", "user_id", "id"),
     )
 
 class CartItem(Base):
@@ -39,4 +41,6 @@ class CartItem(Base):
     __table_args__ = (
         Index("idx_cart_items_cart", "cart_id"),
         Index("idx_cart_items_slipper", "slipper_id"),
+        # Composite index for the totals aggregation join and item upsert lookups
+        Index("idx_cart_items_cart_slipper", "cart_id", "slipper_id"),
     )

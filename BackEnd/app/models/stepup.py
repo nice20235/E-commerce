@@ -73,6 +73,20 @@ class StepUp(Base):
         Index('idx_slippers_category_price', 'category_id', 'price'),
         Index('idx_slippers_quantity_active', 'quantity', 'category_id'),
         Index('idx_slippers_name_category', 'name', 'category_id'),
+        # GIN trigram index to accelerate ILIKE '%...%' searches on name and size.
+        # Requires pg_trgm extension: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        Index(
+            'idx_slippers_name_trgm',
+            'name',
+            postgresql_ops={'name': 'gin_trgm_ops'},
+            postgresql_using='gin',
+        ),
+        Index(
+            'idx_slippers_size_trgm',
+            'size',
+            postgresql_ops={'size': 'gin_trgm_ops'},
+            postgresql_using='gin',
+        ),
     )
     
     def __repr__(self):

@@ -9,7 +9,7 @@ export default function Cart() {
   const queryClient = useQueryClient()
   const { t } = useLang()
 
-  const { data, isLoading, isError } = useQuery({ queryKey: ['cart'], queryFn: getCart })
+  const { data, isLoading, isError } = useQuery({ queryKey: ['cart'], queryFn: getCart, staleTime: 30_000 })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, qty }: { id: number; qty: number }) => updateCartItem(id, qty),
@@ -128,7 +128,7 @@ export default function Cart() {
                 {/* Image */}
                 <Link to={`/products/${item.product_id}`} className="flex-shrink-0 rounded-xl overflow-hidden block" style={{ background: '#f0ede8', width: 64, height: 64 }}>
                   {item.image
-                    ? <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
+                    ? <img src={getImageUrl(item.image)} alt={item.name} loading="lazy" decoding="async" width={64} height={64} className="w-full h-full object-cover" />
                     : (
                       <div className="w-full h-full flex items-center justify-center">
                         <svg className="w-7 h-7" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

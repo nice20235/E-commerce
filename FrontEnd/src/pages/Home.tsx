@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getProducts } from '../api/products'
 import ProductCard from '../components/ProductCard'
@@ -14,28 +14,30 @@ export default function Home() {
   const [sort, setSort] = useState<SortOption>('id_desc')
   const { t, lang } = useLang()
 
-  const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  const SORT_OPTIONS = useMemo<{ value: SortOption; label: string }[]>(() => [
     { value: 'id_desc', label: lang === 'uz' ? 'Yangi' : 'Новые' },
     { value: 'price_asc', label: lang === 'uz' ? 'Arzon' : 'Дешевле' },
     { value: 'price_desc', label: lang === 'uz' ? 'Qimmat' : 'Дороже' },
     { value: 'name_asc', label: 'A–Z' },
-  ]
+  ], [lang])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page, search, sort],
     queryFn: () => getProducts({ skip: (page - 1) * LIMIT, limit: LIMIT, sort, search: search || undefined }),
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
   })
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     setSearch(searchInput.trim())
     setPage(1)
-  }
+  }, [searchInput])
 
-  const handleSort = (value: SortOption) => {
+  const handleSort = useCallback((value: SortOption) => {
     setSort(value)
     setPage(1)
-  }
+  }, [])
 
   return (
     <div>
@@ -44,10 +46,10 @@ export default function Home() {
         className="relative overflow-hidden rounded-2xl sm:rounded-3xl mb-8 sm:mb-12 px-4 py-10 sm:px-16 sm:py-24"
         style={{ background: 'linear-gradient(135deg, #1a2f4e 0%, #0f1e33 55%, #1a2d50 100%)' }}
       >
-        {/* Glow orbs */}
-        <div style={{ background: 'rgba(255,77,28,0.22)', width: 500, height: 500, borderRadius: '50%', position: 'absolute', top: -150, right: -120, filter: 'blur(90px)', pointerEvents: 'none' }} />
-        <div style={{ background: 'rgba(255,77,28,0.10)', width: 350, height: 350, borderRadius: '50%', position: 'absolute', bottom: -100, left: -80, filter: 'blur(70px)', pointerEvents: 'none' }} />
-        <div style={{ background: 'rgba(100,150,255,0.08)', width: 300, height: 300, borderRadius: '50%', position: 'absolute', top: '30%', left: '40%', filter: 'blur(80px)', pointerEvents: 'none' }} />
+        {/* Glow orbs — contain on their own layer to avoid triggering layout on paint */}
+        <div aria-hidden="true" style={{ background: 'rgba(255,77,28,0.22)', width: '60%', paddingTop: '60%', borderRadius: '50%', position: 'absolute', top: '-25%', right: '-15%', filter: 'blur(90px)', pointerEvents: 'none', willChange: 'transform' }} />
+        <div aria-hidden="true" style={{ background: 'rgba(255,77,28,0.10)', width: '40%', paddingTop: '40%', borderRadius: '50%', position: 'absolute', bottom: '-20%', left: '-10%', filter: 'blur(70px)', pointerEvents: 'none', willChange: 'transform' }} />
+        <div aria-hidden="true" style={{ background: 'rgba(100,150,255,0.08)', width: '35%', paddingTop: '35%', borderRadius: '50%', position: 'absolute', top: '30%', left: '40%', filter: 'blur(80px)', pointerEvents: 'none', willChange: 'transform' }} />
 
         {/* Grid texture */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '28px 28px', pointerEvents: 'none' }} />
