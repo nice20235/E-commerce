@@ -22,6 +22,10 @@ function ProductCardInner({ product }: { product: Product }) {
       setAdded(true)
       setTimeout(() => setAdded(false), 2000)
     },
+    onError: () => {
+      // Errors are surfaced via mutation.isError if needed; cart badge stays accurate
+      queryClient.invalidateQueries({ queryKey: ['cart'] })
+    },
   })
 
   const handleAdd = useCallback((e: React.MouseEvent) => {

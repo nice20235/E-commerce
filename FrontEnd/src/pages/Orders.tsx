@@ -107,7 +107,7 @@ export default function Orders() {
       <div className="space-y-4 fade-up">
         {orders.map((order) => {
           const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING
-          const numericId = Number(order.order_id.replace('order_', ''))
+          const numericId = parseInt(order.order_id.replace('order_', ''), 10)
           const statusLabel = s.label[lang] ?? order.status
 
           return (
@@ -179,7 +179,7 @@ export default function Orders() {
                     <span className="truncate">{formatDate(order.created_at)}</span>
                   </div>
 
-                  {order.status === 'PENDING' && (
+                  {order.status === 'PENDING' && !isNaN(numericId) && (
                     <a
                       href={`/api/payment/init/${numericId}?amount=${order.total_amount}`}
                       className="inline-flex items-center justify-center gap-1.5 text-xs text-white rounded-full font-bold transition-all w-full sm:w-auto flex-shrink-0"

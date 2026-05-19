@@ -7,13 +7,21 @@ interface LangState {
   setLang: (lang: Lang) => void
 }
 
+function _initLang(): Lang {
+  try {
+    return (localStorage.getItem('lang') as Lang) ?? 'uz'
+  } catch {
+    return 'uz'
+  }
+}
+
 export const useLang = create<LangState>((set, get) => ({
-  lang: (localStorage.getItem('lang') as Lang) ?? 'uz',
+  lang: _initLang(),
 
   t: (key: TKey) => translations[get().lang][key] ?? key,
 
   setLang: (lang: Lang) => {
-    localStorage.setItem('lang', lang)
+    try { localStorage.setItem('lang', lang) } catch { /* ignore storage errors */ }
     set({ lang })
   },
 }))

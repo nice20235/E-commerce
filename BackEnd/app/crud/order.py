@@ -110,7 +110,10 @@ async def create_order(
                 )
                 .where(Order.id == existing.id)
             )
-            return result.scalar_one()
+            reloaded = result.scalar_one_or_none()
+            if reloaded is not None:
+                return reloaded
+            # Order was deleted between the two queries; fall through to create a new one
 
     # Optional: merge into latest pending order within a recent window only if explicitly enabled.
     merge_target = None
@@ -176,7 +179,9 @@ async def create_order(
         reloaded = await db.execute(
             select(Order).options(selectinload(Order.items)).where(Order.id == merge_target.id)
         )
-        merge_obj = reloaded.scalar_one()
+        merge_obj = reloaded.scalar_one_or_none()
+        if merge_obj is None:
+            raise ValueError(f"Order {merge_target.id} not found during total recompute")
         merge_obj.total_amount = _compute_total_tiyin_from_items(merge_obj.items or [])
         db.add(merge_obj)
         await db.commit()
@@ -190,7 +195,10 @@ async def create_order(
             )
             .where(Order.id == merge_target.id)
         )
-        return result.scalar_one()
+        merged_final = result.scalar_one_or_none()
+        if merged_final is None:
+            raise ValueError(f"Order {merge_target.id} not found after merge")
+        return merged_final
     # First pass: aggregate requested quantities and validate against stock
     requested: dict[int, int] = {}
     item_ids: list[int] = []
@@ -324,7 +332,10 @@ async def create_order(
         )
         .where(Order.id == db_order.id)
     )
-    return result.scalar_one()
+    created_final = result.scalar_one_or_none()
+    if created_final is None:
+        raise ValueError(f"Order {db_order.id} not found after creation")
+    return created_final
 
 async def update_order(db: AsyncSession, db_order: Order, order_update: OrderUpdate) -> Order:
     """Update an existing order and return with relationships."""
@@ -342,7 +353,10 @@ async def update_order(db: AsyncSession, db_order: Order, order_update: OrderUpd
         )
         .where(Order.id == db_order.id)
     )
-    return result.scalar_one()
+    refreshed = result.scalar_one_or_none()
+    if refreshed is None:
+        raise ValueError(f"Order {db_order.id} not found after update")
+    return refreshed
 
 async def update_order_status(db: AsyncSession, order_id: int, status: OrderStatus) -> Optional[Order]:
     """Update order status"""
@@ -371,7 +385,10 @@ async def update_order_status(db: AsyncSession, order_id: int, status: OrderStat
         )
         .where(Order.id == order.id)
     )
-    return result.scalar_one()
+    refreshed = result.scalar_one_or_none()
+    if refreshed is None:
+        raise ValueError(f"Order {order.id} not found after status update")
+    return refreshed
 
 async def delete_order(db: AsyncSession, db_order: Order) -> bool:
     """Delete order (cascade will delete items)"""

@@ -155,7 +155,7 @@ export default function AllOrders() {
       {!!filtered?.length && (
         <div className="space-y-3">
           {filtered.map((order) => {
-            const numericId = Number(order.order_id.replace('order_', ''))
+            const numericId = parseInt(order.order_id.replace('order_', ''), 10)
             const isExpanded = expandedId === order.order_id
             const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING
             const statusLabel = s.label[lang] ?? order.status

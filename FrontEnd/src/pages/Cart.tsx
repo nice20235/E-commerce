@@ -14,14 +14,17 @@ export default function Cart() {
   const updateMutation = useMutation({
     mutationFn: ({ id, qty }: { id: number; qty: number }) => updateCartItem(id, qty),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
+    onError: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
   })
   const removeMutation = useMutation({
     mutationFn: (id: number) => removeCartItem(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
+    onError: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
   })
   const clearMutation = useMutation({
     mutationFn: clearCart,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
+    onError: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
   })
 
   const cart = data?.data

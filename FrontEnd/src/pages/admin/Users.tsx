@@ -17,10 +17,17 @@ export default function AdminUsers() {
     staleTime: 30_000,
   })
 
+  const [deleteError, setDeleteError] = useState('')
+
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setConfirmDelete(null)
+      setDeleteError('')
+    },
+    onError: () => {
+      setDeleteError(L('Xatolik yuz berdi', 'Ошибка при удалении'))
       setConfirmDelete(null)
     },
   })
@@ -34,6 +41,11 @@ export default function AdminUsers() {
 
   return (
     <div>
+      {deleteError && (
+        <div className="mb-4 flex items-center gap-2 text-xs font-medium px-4 py-3 rounded-xl" style={{ background: '#fff0ee', color: '#e03c10', border: '1px solid #ffd5cc' }}>
+          {deleteError}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-5 sm:mb-6">
         <div>

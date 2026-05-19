@@ -228,7 +228,7 @@ async def list_orders(
                 "order_id": f"order_{order.id}",
                 "user_id": order.user_id,
                 "user_name": (f"{users_by_id[order.user_id][0]} {users_by_id[order.user_id][1]}".strip() if order.user_id in users_by_id else None),
-                "status": order.status.value,
+                "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
                 "total_amount": int(order.total_amount or 0),
                 "created_at": format_tashkent_compact(order.created_at),
                 "updated_at": format_tashkent_compact(order.updated_at),

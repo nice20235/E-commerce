@@ -50,9 +50,13 @@ class CompressionHeaderMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Add compression hints for JSON responses
+        try:
+            _content_length = int(response.headers.get("content-length", "0") or "0")
+        except (ValueError, TypeError):
+            _content_length = 0
         if (
             response.headers.get("content-type", "").startswith("application/json") and
-            int(response.headers.get("content-length", "0")) > 1024  # Only for larger responses
+            _content_length > 1024  # Only for larger responses
         ):
             response.headers["X-Compress-Hint"] = "true"
         

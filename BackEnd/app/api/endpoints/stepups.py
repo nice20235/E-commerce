@@ -137,7 +137,7 @@ async def read_slipper(
         base = _serialize_stepup(stepup, images=images)
         base.update(
             {
-                "created_at": stepup.created_at.isoformat(),
+                "created_at": stepup.created_at.isoformat() if stepup.created_at else None,
                 "updated_at": stepup.updated_at.isoformat() if stepup.updated_at else None,
             }
         )

@@ -18,7 +18,9 @@ async def _reload_cart(db: AsyncSession, cart_id: int) -> Cart:
         .where(Cart.id == cart_id)
         .options(*_cart_with_items())
     )
-    cart = q.scalar_one()
+    cart = q.scalar_one_or_none()
+    if cart is None:
+        raise ValueError(f"Cart {cart_id} not found after operation")
     cart.items.sort(key=lambda ci: ci.id)
     return cart
 
@@ -95,9 +97,10 @@ async def update_item(db: AsyncSession, user_id: int, cart_item_id: int, update:
         if slipper is None:
             slipper = (await db.execute(select(StepUp).where(StepUp.id == target.slipper_id))).scalar_one_or_none()
         req = int(update.quantity)
-        if req > (slipper.quantity or 0):
+        available = int(slipper.quantity or 0) if slipper is not None else 0
+        if slipper is None or req > available:
             raise ValueError(
-                f"Requested quantity exceeds available stock (requested={req}, available={slipper.quantity})"
+                f"Requested quantity exceeds available stock (requested={req}, available={available})"
             )
         target.quantity = req
         db.add(target)

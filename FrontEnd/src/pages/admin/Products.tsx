@@ -95,6 +95,7 @@ export default function AdminProducts() {
       queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
       setDeleteConfirm(null)
     },
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to delete')),
   })
 
   const uploadMutation = useMutation({
@@ -103,6 +104,7 @@ export default function AdminProducts() {
       queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
     },
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to upload images')),
   })
 
   const deleteImageMutation = useMutation({
@@ -112,6 +114,7 @@ export default function AdminProducts() {
       queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
     },
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to delete image')),
   })
 
   const handleEdit = (p: Product) => {

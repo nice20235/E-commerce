@@ -198,8 +198,10 @@ async def update_own_profile(
         fresh_user = await get_user(db, current_user.id)
         if not fresh_user or not verify_password(user_update.current_password or "", fresh_user.password_hash):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
-        # Update password (stored as-is per current policy)
-        await update_user_password(db, current_user.name, user_update.new_password)
+        # Update password by user ID to avoid stale-name lookup issues
+        updated_pw = await update_user_password(db, fresh_user.name, user_update.new_password)
+        if not updated_pw:
+            raise HTTPException(status_code=500, detail="Failed to update password")
 
     # Sanitize payload to exclude is_admin and password fields
     payload = user_update.model_dump(exclude_unset=True)

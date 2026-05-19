@@ -191,8 +191,8 @@ class UserSelfUpdate(BaseModel):
 class UserProfileResponse(BaseModel):
     """Public user profile returned by /users/me endpoints"""
     name: str
-    surname: str
-    phone_number: str
+    surname: Optional[str] = None
+    phone_number: Optional[str] = None
     is_admin: bool = False
 
     model_config = {

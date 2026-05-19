@@ -89,7 +89,10 @@ export default function Checkout() {
 
   /* ── Order placed success screen ── */
   if (createdOrder) {
-    const orderId = Number(createdOrder.order_id.replace('order_', ''))
+    const rawId = createdOrder.order_id.startsWith('order_')
+      ? createdOrder.order_id.slice('order_'.length)
+      : createdOrder.order_id
+    const orderId = parseInt(rawId, 10)
     return (
       <div className="max-w-md mx-auto text-center py-8 sm:py-12 px-0">
         <div className="rounded-2xl sm:rounded-3xl p-6 sm:p-10" style={{ background: '#fff', boxShadow: '0 8px 40px rgba(0,0,0,0.1)' }}>
@@ -115,7 +118,7 @@ export default function Checkout() {
 
           <div className="space-y-3">
             <button
-              onClick={() => initPayment(orderId, createdOrder.total_amount)}
+              onClick={() => { if (!isNaN(orderId)) initPayment(orderId, createdOrder.total_amount) }}
               className="w-full text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
               style={{
                 background: 'linear-gradient(135deg, #ff4d1c, #ff6a3c)',
