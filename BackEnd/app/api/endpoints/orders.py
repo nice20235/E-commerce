@@ -144,7 +144,7 @@ async def create_order_from_cart(
         # Public order identifier, similar to cart_1 pattern
         "order_id": f"order_{new_order.id}",
         "status": new_order.status.value if hasattr(new_order.status, 'value') else str(new_order.status),
-    "total_amount": int(new_order.total_amount or 0),
+        "total_amount": int(new_order.total_amount or 0),
         "notes": new_order.notes,
         "created_at": created_compact,
         "items": [

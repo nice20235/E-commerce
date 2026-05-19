@@ -19,6 +19,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     if (!isAuthenticated) { navigate('/login'); return }
     if (!product.is_available) return
     addMutation.mutate()

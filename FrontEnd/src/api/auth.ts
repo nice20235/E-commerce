@@ -22,6 +22,3 @@ export const register = (data: RegisterPayload) =>
 
 export const logout = () =>
   client.post('/auth/logout').then((r) => r.data)
-
-export const forgotPassword = (name: string, new_password: string) =>
-  client.post('/auth/forgot-password', { name, new_password, confirm_new_password: new_password }).then((r) => r.data)

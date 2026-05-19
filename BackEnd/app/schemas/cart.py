@@ -31,8 +31,7 @@ class CartItemOut(BaseModel):
     price: Optional[float] = None
     total_price: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class CartOut(BaseModel):
     id: int
@@ -41,8 +40,7 @@ class CartOut(BaseModel):
     total_quantity: int
     total_amount: float
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class CartTotalOut(BaseModel):

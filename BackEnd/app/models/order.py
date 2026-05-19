@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index, Enum
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index, Enum, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
 from datetime import datetime
@@ -60,15 +60,24 @@ class Order(Base):
     user: Mapped["User"] = relationship("User", back_populates="orders")
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     
-    # Indexes for better query performance  
+    # Indexes for better query performance
     __table_args__ = (
     Index('idx_orders_user', 'user_id'),
     Index('idx_orders_status', 'status'),
     Index('idx_orders_created', 'created_at'),
     Index('idx_orders_updated', 'updated_at'),
     Index('idx_orders_order_id', 'order_id'),
-    # Uniqueness scoped to idempotency key if provided
-    Index('uq_orders_idempotency_key', 'idempotency_key', unique=True),
+    # Uniqueness scoped to non-NULL idempotency keys only.
+    # A plain unique index on a nullable column in PostgreSQL correctly
+    # allows multiple NULLs (NULL IS NOT DISTINCT from NULL only with
+    # NULLS NOT DISTINCT, which is not the default). The index below
+    # uses postgresql_where to make the intent explicit and portable.
+    Index(
+        'uq_orders_idempotency_key',
+        'idempotency_key',
+        unique=True,
+        postgresql_where=text("idempotency_key IS NOT NULL"),
+    ),
     # Composite indexes for common queries
     Index('idx_orders_user_status', 'user_id', 'status'),
     Index('idx_orders_user_created', 'user_id', 'created_at'),

@@ -232,9 +232,9 @@ export default function AllOrders() {
                       {order.items.map((item, idx) => (
                         <div key={`${item.slipper_id}-${idx}`} className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            {(item as { image?: string }).image ? (
+                            {item.image ? (
                               <img
-                                src={(item as { image?: string }).image}
+                                src={item.image}
                                 alt={item.name ?? ''}
                                 className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
                                 style={{ background: '#f0ede8' }}

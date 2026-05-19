@@ -121,6 +121,7 @@ export default function AdminLayout() {
           {/* Hamburger / close */}
           <button
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen(v => !v)}
             className="flex items-center justify-center rounded-xl transition-all"
             style={{ color: 'rgba(255,255,255,0.6)', width: 36, height: 36, background: 'rgba(255,255,255,0.07)' }}

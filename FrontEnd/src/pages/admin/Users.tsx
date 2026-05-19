@@ -35,9 +35,9 @@ export default function AdminUsers() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5 sm:mb-6">
         <div>
-          <h1 className="text-xl font-black" style={{ color: '#1a2f4e' }}>
+          <h1 className="text-lg sm:text-xl font-black" style={{ color: '#1a2f4e' }}>
             {L('Foydalanuvchilar', 'Пользователи')}
           </h1>
           {data && (

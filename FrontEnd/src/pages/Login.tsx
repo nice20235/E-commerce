@@ -77,6 +77,7 @@ export default function Login() {
                 {t('username')}
               </label>
               <input
+                type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="masalan: ali_karimov"

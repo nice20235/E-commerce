@@ -164,9 +164,10 @@ cors_kwargs = dict(
 # This ensures localhost works in development even when a production regex is configured.
 cors_kwargs["allow_origins"] = allowed
 origin_regex = getattr(settings, "ALLOWED_ORIGIN_REGEX", None)
-# In DEBUG, be permissive to avoid accidental CORS blocks during development or staging
+# In DEBUG with no explicit regex, allow localhost variants only — not a wildcard.
+# A true wildcard (r".*") would allow any origin and must never be set in production.
 if settings.DEBUG and not origin_regex:
-    origin_regex = r".*"
+    origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 if origin_regex:
     cors_kwargs["allow_origin_regex"] = origin_regex
 

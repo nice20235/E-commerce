@@ -71,6 +71,7 @@ export interface OrderItem {
   size: string | null
   image: string | null
   notes?: string | null
+  id?: number
 }
 
 export interface Order {

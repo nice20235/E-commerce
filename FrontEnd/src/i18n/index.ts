@@ -100,13 +100,14 @@ export const translations = {
 
     // Auth - Forgot
     resetPassword: 'Parolni tiklash',
-    resetSub: 'Foydalanuvchi nomingiz va yangi parolni kiriting',
+    resetSub: 'Parolni tiklash uchun qo\'llab-quvvatlash xizmatiga murojaat qiling.',
     newPassword: 'Yangi Parol',
     resetBtn: 'Parolni tiklash',
     resetting: 'Tiklanmoqda…',
     backToLogin: 'Kirishga qaytish',
     passwordUpdated: 'Parol yangilandi!',
     redirecting: 'Kirishga yo\'naltirilmoqda…',
+    resetContactSupport: 'Parolni tiklash uchun do\'kon administratori bilan bog\'laning.',
 
     // Validation
     allRequired: 'Barcha maydonlar majburiy',
@@ -277,13 +278,14 @@ export const translations = {
 
     // Auth - Forgot
     resetPassword: 'Сброс пароля',
-    resetSub: 'Введите имя пользователя и новый пароль',
+    resetSub: 'Для сброса пароля обратитесь в службу поддержки.',
     newPassword: 'Новый пароль',
     resetBtn: 'Сбросить пароль',
     resetting: 'Обновление…',
     backToLogin: 'Войти',
     passwordUpdated: 'Пароль обновлён!',
     redirecting: 'Перенаправление…',
+    resetContactSupport: 'Для сброса пароля обратитесь к администратору магазина.',
 
     // Validation
     allRequired: 'Все поля обязательны',

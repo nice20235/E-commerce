@@ -138,9 +138,9 @@ export default function Orders() {
                   {order.items.slice(0, 3).map((item, idx) => (
                     <div key={`${item.slipper_id}-${idx}`} className="flex items-center justify-between text-xs gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        {(item as { image?: string }).image ? (
+                        {item.image ? (
                           <img
-                            src={(item as { image?: string }).image ?? ''}
+                            src={item.image}
                             alt={item.name ?? ''}
                             className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
                             style={{ background: '#f0ede8' }}

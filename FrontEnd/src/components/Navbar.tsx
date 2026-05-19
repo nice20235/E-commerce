@@ -207,7 +207,7 @@ export default function Navbar() {
           aria-hidden="true"
         >
           <div
-            className="absolute top-[60px] left-0 right-0 fade-up"
+            className="absolute top-[60px] sm:top-[64px] left-0 right-0 fade-up"
             style={{
               background: 'linear-gradient(135deg, #1a2f4e 0%, #0f1e33 100%)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',

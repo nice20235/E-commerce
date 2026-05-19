@@ -19,8 +19,8 @@ export const deleteOrder = (id: number) =>
 /**
  * Redirects the user to the bank payment page.
  * @param orderId - numeric order id
- * @param amountUzs - total amount in UZS (will be converted to tiyin × 100)
+ * @param amountTiyin - total amount in tiyin (UZS × 100), as stored in order.total_amount
  */
-export const initPayment = (orderId: number, amountUzs: number) => {
-  window.location.href = `/api/payment/init/${orderId}?amount=${Math.round(amountUzs * 100)}`
+export const initPayment = (orderId: number, amountTiyin: number) => {
+  window.location.href = `/api/payment/init/${orderId}?amount=${Math.round(amountTiyin)}`
 }

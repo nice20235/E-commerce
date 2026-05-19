@@ -24,7 +24,6 @@ export default function Home() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page, search, sort],
     queryFn: () => getProducts({ skip: (page - 1) * LIMIT, limit: LIMIT, sort, search: search || undefined }),
-    staleTime: 60_000,
   })
 
   const handleSearch = (e: React.FormEvent) => {

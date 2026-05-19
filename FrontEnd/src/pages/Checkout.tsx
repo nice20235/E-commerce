@@ -97,7 +97,7 @@ export default function Checkout() {
 
           <div className="space-y-3">
             <button
-              onClick={() => initPayment(orderId, createdOrder.total_amount / 100)}
+              onClick={() => initPayment(orderId, createdOrder.total_amount)}
               className="w-full text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
               style={{
                 background: 'linear-gradient(135deg, #ff4d1c, #ff6a3c)',
@@ -157,8 +157,8 @@ export default function Checkout() {
             <div key={item.cart_item_id} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f0ede8' }}>
-                  {(item as { image?: string }).image ? (
-                    <img src={(item as { image?: string }).image} alt={item.name} className="w-full h-full object-cover" />
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <svg className="w-4 h-4" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

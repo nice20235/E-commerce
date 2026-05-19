@@ -55,8 +55,8 @@ export default function AdminProducts() {
       quantity: parseInt(form.quantity),
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
       setForm(emptyForm)
       setShowForm(false)
       setError('')
@@ -72,8 +72,8 @@ export default function AdminProducts() {
       quantity: parseInt(form.quantity),
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
       setForm(emptyForm)
       setEditId(null)
       setShowForm(false)
@@ -85,8 +85,8 @@ export default function AdminProducts() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteProduct(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
       setDeleteConfirm(null)
     },
   })
@@ -94,8 +94,8 @@ export default function AdminProducts() {
   const uploadMutation = useMutation({
     mutationFn: ({ id, files }: { id: number; files: File[] }) => uploadProductImages(id, files),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
     },
   })
 

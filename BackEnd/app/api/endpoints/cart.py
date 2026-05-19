@@ -148,8 +148,8 @@ async def update_cart_item(cart_item_id: int, payload: CartItemUpdate, user=Depe
         await update_item(db, user.id, cart_item_id, payload)
     except ValueError as e:
         msg = str(e)
-        status = 404 if "not found" in msg.lower() else 400
-        raise HTTPException(status_code=status, detail=msg)
+        status_code = 404 if "not found" in msg.lower() else 400
+        raise HTTPException(status_code=status_code, detail=msg)
 
     cart = await get_cart(db, user.id)
     if cart is None:

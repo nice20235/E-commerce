@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from app.models.order import OrderStatus
@@ -6,59 +6,56 @@ from app.models.order import OrderStatus
 # Order Item schemas
 class OrderItemBase(BaseModel):
     slipper_id: int = Field(
-        ..., description="Slipper ID", gt=0, example=1
+        ..., description="Slipper ID", gt=0, examples=[1]
     )
     quantity: int = Field(
-		..., description="Quantity ordered", gt=0, example=2
+		..., description="Quantity ordered", gt=0, examples=[2]
     )
     unit_price: float = Field(
-        ..., description="Unit price at order time (ignored on create, taken from product)", gt=0, example=650.0
+        ..., description="Unit price at order time (ignored on create, taken from product)", gt=0, examples=[650.0]
     )
     notes: Optional[str] = Field(
-        None, description="Special instructions", max_length=255, example="Handle with care"
+        None, description="Special instructions", max_length=255, examples=["Handle with care"]
     )
 
 class OrderItemCreate(OrderItemBase):
-    class Config:
-        json_schema_extra = {
-            "example": {
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
                 "slipper_id": 1,
                 "quantity": 2,
                 "unit_price": 650.0,
                 "notes": "Handle with care"
-            }
+            }]
         }
+    }
 
 class OrderItemUpdate(BaseModel):
     quantity: Optional[int] = Field(
-        None, 
-        description="Quantity ordered", 
+        None,
+        description="Quantity ordered",
         gt=0,
-        example=2
+        examples=[2],
     )
     unit_price: Optional[float] = Field(
-        None, 
-        description="Unit price", 
+        None,
+        description="Unit price",
         gt=0,
-        example=650.0
+        examples=[650.0],
     )
     notes: Optional[str] = Field(
-        None, 
-        description="Special instructions", 
+        None,
+        description="Special instructions",
         max_length=255,
-        example="Extra cheese, please"
+        examples=["Extra cheese, please"],
     )
 
 class OrderItemInDB(OrderItemBase):
-    id: int = Field(..., description="Order item ID", example=1)
-    total_price: float = Field(..., description="Total price for this item", example=1300.0)
-    created_at: datetime = Field(..., description="Item creation timestamp", example="2024-01-15T10:30:00Z")
-    
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    id: int = Field(..., description="Order item ID", examples=[1])
+    total_price: float = Field(..., description="Total price for this item", examples=[1300.0])
+    created_at: datetime = Field(..., description="Item creation timestamp", examples=["2024-01-15T10:30:00Z"])
+
+    model_config = {"from_attributes": True}
 
 class OrderItemResponse(OrderItemInDB):
     """Order item response schema for API endpoints"""
@@ -66,16 +63,17 @@ class OrderItemResponse(OrderItemInDB):
 
 # -------------------- Public (API) simplified schemas --------------------
 class OrderItemCreatePublic(BaseModel):
-    slipper_id: int = Field(..., description="Slipper ID", gt=0, example=1)
-    quantity: int = Field(..., description="Quantity ordered", gt=0, example=2)
+    slipper_id: int = Field(..., description="Slipper ID", gt=0, examples=[1])
+    quantity: int = Field(..., description="Quantity ordered", gt=0, examples=[2])
     notes: Optional[str] = Field(None, description="Item notes", max_length=255)
 
 class OrderCreatePublic(BaseModel):
-    items: List[OrderItemCreatePublic] = Field(..., min_items=1, description="Order items")
+    items: List[OrderItemCreatePublic] = Field(..., min_length=1, description="Order items")
     notes: Optional[str] = Field(None, description="Order notes", max_length=500)
 
-    @validator('items')
-    def validate_items(cls, v):  # type: ignore
+    @field_validator('items')
+    @classmethod
+    def validate_items(cls, v: list) -> list:
         if not v:
             raise ValueError('Order must have at least one item')
         return v
@@ -121,11 +119,12 @@ class OrderBase(BaseModel):
 class OrderCreate(BaseModel):
     order_id: Optional[str] = Field(None, description="Unique order identifier (auto-generated)", min_length=1, max_length=32)
     user_id: int = Field(..., description="User ID", gt=0)
-    items: List[OrderItemCreate] = Field(..., description="Order items", min_items=1)
+    items: List[OrderItemCreate] = Field(..., description="Order items", min_length=1)
     notes: Optional[str] = Field(None, description="Order notes", max_length=500)
-    
-    @validator('items')
-    def validate_items(cls, v):
+
+    @field_validator('items')
+    @classmethod
+    def validate_items(cls, v: list) -> list:
         if not v:
             raise ValueError('Order must have at least one item')
         return v
@@ -139,12 +138,8 @@ class OrderInDB(OrderBase):
     created_at: datetime = Field(..., description="Order creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     items: List[OrderItemInDB] = Field(..., description="Order items")
-    
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+
+    model_config = {"from_attributes": True}
 
 class OrderResponse(OrderInDB):
     """Order response schema for API endpoints"""

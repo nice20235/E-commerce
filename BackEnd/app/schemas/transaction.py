@@ -135,5 +135,4 @@ class TransactionOut(BaseModel):
     account_data: dict[str, Any]
     reason: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
