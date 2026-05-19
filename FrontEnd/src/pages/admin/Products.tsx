@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProducts, createProduct, updateProduct, deleteProduct, uploadProductImages, deleteProductImage } from '../../api/products'
 import type { Product } from '../../types'
@@ -348,8 +348,8 @@ export default function AdminProducts() {
             </thead>
             <tbody>
               {data?.items.map((product, idx) => (
+                <React.Fragment key={product.id}>
                 <tr
-                  key={product.id}
                   style={{
                     borderBottom: idx < (data.items.length - 1) ? '1px solid rgba(232,229,224,0.5)' : 'none',
                     background: deleteConfirm === product.id ? '#fef2f2' : 'transparent',
@@ -487,6 +487,7 @@ export default function AdminProducts() {
                     </td>
                   </tr>
                 )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
