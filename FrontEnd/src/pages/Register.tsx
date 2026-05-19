@@ -40,11 +40,29 @@ export default function Register() {
     mutationFn: register,
     onSuccess: (data) => { setAuth(data.user) },
     onError: (err: unknown) => {
-      const axErr = err as AxiosError<{ detail?: string }>
-      const detail = axErr.response?.data?.detail ?? ''
-      if (typeof detail === 'string' && detail.toLowerCase().includes('name')) {
+      const axErr = err as AxiosError<{ detail?: unknown }>
+      const detail = axErr.response?.data?.detail
+
+      // 422 Pydantic error: detail is an array of {msg, loc} objects
+      if (Array.isArray(detail)) {
+        const msgs = detail.map((d: { msg?: string; loc?: string[] }) =>
+          (d.msg ?? '').toLowerCase()
+        ).join(' ')
+        if (msgs.includes('phone') || msgs.includes('start with +') || msgs.includes('digit')) {
+          setError(t('phoneInvalid'))
+        } else if (msgs.includes('password')) {
+          setError(t('passwordMismatch'))
+        } else {
+          setError(t('registerFailed'))
+        }
+        return
+      }
+
+      // 400 error: detail is a plain string
+      const msg = (typeof detail === 'string' ? detail : '').toLowerCase()
+      if (msg.includes('name')) {
         setError(t('userExists'))
-      } else if (typeof detail === 'string' && detail.toLowerCase().includes('phone')) {
+      } else if (msg.includes('phone')) {
         setError(t('phoneExists'))
       } else {
         setError(t('registerFailed'))
@@ -59,6 +77,7 @@ export default function Register() {
     setError('')
     const { name, surname, phone_number, password, confirm } = form
     if (!name || !surname || !phone_number || !password) { setError(t('allRequired')); return }
+    if (!phone_number.startsWith('+')) { setError(t('phoneInvalid')); return }
     if (password !== confirm) { setError(t('passwordMismatch')); return }
     if (password.length < 8) { setError(t('passwordShort')); return }
     mutation.mutate({ name, surname, phone_number, password, confirm_password: confirm })
@@ -128,9 +147,20 @@ export default function Register() {
                 placeholder="+998901234567"
                 autoComplete="tel"
                 inputMode="tel"
-                style={baseInputStyle}
+                style={{
+                  ...baseInputStyle,
+                  borderColor: form.phone_number && !form.phone_number.startsWith('+') ? '#f87171' : undefined,
+                }}
                 {...focusHandlers}
               />
+              {form.phone_number && !form.phone_number.startsWith('+') && (
+                <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#dc2626' }}>
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {t('phoneInvalid')}
+                </p>
+              )}
             </div>
 
             {/* Password */}

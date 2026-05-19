@@ -86,6 +86,7 @@ export const translations = {
     loginFailed: 'Kirishda xatolik. Qayta urinib ko\'ring.',
     userExists: 'Bu foydalanuvchi nomi allaqachon band',
     phoneExists: 'Bu telefon raqami allaqachon ro\'yxatdan o\'tgan',
+    phoneInvalid: 'Telefon raqami + bilan boshlanishi kerak (masalan: +998901234567)',
     registerFailed: 'Ro\'yxatdan o\'tishda xatolik yuz berdi',
 
     // Auth - Register
@@ -264,6 +265,7 @@ export const translations = {
     loginFailed: 'Ошибка входа. Попробуйте ещё раз.',
     userExists: 'Это имя пользователя уже занято',
     phoneExists: 'Этот номер телефона уже зарегистрирован',
+    phoneInvalid: 'Номер телефона должен начинаться с + (например: +998901234567)',
     registerFailed: 'Ошибка при регистрации',
 
     // Auth - Register
