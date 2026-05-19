@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProducts, createProduct, updateProduct, deleteProduct, uploadProductImages } from '../../api/products'
+import { getProducts, createProduct, updateProduct, deleteProduct, uploadProductImages, deleteProductImage } from '../../api/products'
 import type { Product } from '../../types'
 import { useLang } from '../../store/lang'
 import { extractApiError } from '../../api/errors'
@@ -40,6 +40,7 @@ export default function AdminProducts() {
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [imagesPanel, setImagesPanel] = useState<number | null>(null)
   const LIMIT = 10
   const { t } = useLang()
 
@@ -94,6 +95,15 @@ export default function AdminProducts() {
 
   const uploadMutation = useMutation({
     mutationFn: ({ id, files }: { id: number; files: File[] }) => uploadProductImages(id, files),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
+    },
+  })
+
+  const deleteImageMutation = useMutation({
+    mutationFn: ({ productId, imageId }: { productId: number; imageId: number }) =>
+      deleteProductImage(productId, imageId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
@@ -402,19 +412,16 @@ export default function AdminProducts() {
                         </>
                       ) : (
                         <>
-                          <label
-                            className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
-                            style={{ background: '#eff6ff', color: '#3b82f6', border: '1.5px solid #dbeafe', minHeight: 36 }}
-                            title={t('photo')}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.color = '#1d4ed8' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#3b82f6' }}
+                          <button
+                            onClick={() => setImagesPanel(imagesPanel === product.id ? null : product.id)}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                            style={{ background: imagesPanel === product.id ? '#dbeafe' : '#eff6ff', color: imagesPanel === product.id ? '#1d4ed8' : '#3b82f6', border: '1.5px solid #dbeafe', minHeight: 36 }}
                           >
                             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            {t('photo')}
-                            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e, product.id)} />
-                          </label>
+                            {t('photo')} {product.images && product.images.length > 0 && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: '#3b82f6', color: '#fff' }}>{product.images.length}</span>}
+                          </button>
                           <button
                             onClick={() => handleEdit(product)}
                             className="inline-flex items-center justify-center text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
@@ -438,6 +445,48 @@ export default function AdminProducts() {
                     </div>
                   </td>
                 </tr>
+                {/* Images panel */}
+                {imagesPanel === product.id && (
+                  <tr style={{ background: '#f8faff' }}>
+                    <td colSpan={5} className="px-5 py-4">
+                      <div className="flex flex-wrap gap-3 items-start">
+                        {product.images && product.images.length > 0 ? product.images.map((img) => (
+                          <div key={img.id} className="relative group">
+                            <img
+                              src={getImageUrl(img.image_path)}
+                              alt=""
+                              className="w-20 h-20 object-cover rounded-xl"
+                              style={{ border: '1.5px solid #e8e5e0' }}
+                            />
+                            <button
+                              onClick={() => deleteImageMutation.mutate({ productId: product.id, imageId: img.id })}
+                              disabled={deleteImageMutation.isPending}
+                              className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                              style={{ background: '#dc2626', fontSize: 10 }}
+                              title="O'chirish"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )) : (
+                          <p className="text-xs" style={{ color: '#aaa' }}>Rasm yo'q</p>
+                        )}
+                        {/* Upload new */}
+                        <label
+                          className="w-20 h-20 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all gap-1"
+                          style={{ border: '1.5px dashed #3b82f6', color: '#3b82f6', background: '#eff6ff' }}
+                          title="Rasm qo'shish"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          <span className="text-[10px] font-semibold">Qo'shish</span>
+                          <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e, product.id)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               ))}
             </tbody>
           </table>
@@ -498,32 +547,57 @@ export default function AdminProducts() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2.5">
-                    <label
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all"
-                      style={{ border: '1.5px solid #dbeafe', color: '#3b82f6', background: '#eff6ff', minHeight: 44, padding: '12px 8px' }}
-                    >
-                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {t('photo')}
-                      <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e, product.id)} />
-                    </label>
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="flex-1 flex items-center justify-center rounded-xl text-xs font-semibold transition-all"
-                      style={{ border: '1.5px solid #e8e5e0', color: '#1a2f4e', background: '#fff', minHeight: 44, padding: '12px 8px' }}
-                    >
-                      {t('edit')}
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(product.id)}
-                      className="flex-1 flex items-center justify-center rounded-xl text-xs font-semibold transition-all"
-                      style={{ border: '1.5px solid #fecaca', color: '#dc2626', background: '#fef2f2', minHeight: 44, padding: '12px 8px' }}
-                    >
-                      {t('delete')}
-                    </button>
-                  </div>
+                  <>
+                    <div className="flex gap-2.5">
+                      <button
+                        onClick={() => setImagesPanel(imagesPanel === product.id ? null : product.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all"
+                        style={{ border: '1.5px solid #dbeafe', color: imagesPanel === product.id ? '#1d4ed8' : '#3b82f6', background: imagesPanel === product.id ? '#dbeafe' : '#eff6ff', minHeight: 44, padding: '12px 8px' }}
+                      >
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {t('photo')} {product.images && product.images.length > 0 && <span className="rounded-full px-1.5 text-[10px] font-bold" style={{ background: '#3b82f6', color: '#fff' }}>{product.images.length}</span>}
+                      </button>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="flex-1 flex items-center justify-center rounded-xl text-xs font-semibold transition-all"
+                        style={{ border: '1.5px solid #e8e5e0', color: '#1a2f4e', background: '#fff', minHeight: 44, padding: '12px 8px' }}
+                      >
+                        {t('edit')}
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(product.id)}
+                        className="flex-1 flex items-center justify-center rounded-xl text-xs font-semibold transition-all"
+                        style={{ border: '1.5px solid #fecaca', color: '#dc2626', background: '#fef2f2', minHeight: 44, padding: '12px 8px' }}
+                      >
+                        {t('delete')}
+                      </button>
+                    </div>
+                    {/* Mobile images panel */}
+                    {imagesPanel === product.id && (
+                      <div className="mt-3 pt-3" style={{ borderTop: '1px solid #e8e5e0' }}>
+                        <div className="flex flex-wrap gap-2">
+                          {product.images && product.images.length > 0 ? product.images.map((img) => (
+                            <div key={img.id} className="relative">
+                              <img src={getImageUrl(img.image_path)} alt="" className="w-16 h-16 object-cover rounded-xl" style={{ border: '1.5px solid #e8e5e0' }} />
+                              <button
+                                onClick={() => deleteImageMutation.mutate({ productId: product.id, imageId: img.id })}
+                                disabled={deleteImageMutation.isPending}
+                                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white disabled:opacity-50"
+                                style={{ background: '#dc2626', fontSize: 10 }}
+                              >✕</button>
+                            </div>
+                          )) : <p className="text-xs" style={{ color: '#aaa' }}>Rasm yo'q</p>}
+                          <label className="w-16 h-16 rounded-xl flex flex-col items-center justify-center cursor-pointer gap-0.5" style={{ border: '1.5px dashed #3b82f6', color: '#3b82f6', background: '#eff6ff' }}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            <span className="text-[9px] font-semibold">Qo'shish</span>
+                            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e, product.id)} />
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
