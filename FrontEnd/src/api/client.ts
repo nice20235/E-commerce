@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+const API_BASE = import.meta.env.VITE_API_URL ?? '/'
+
 const client = axios.create({
-  baseURL: '/',
+  baseURL: API_BASE,
   withCredentials: true, // always send HttpOnly cookies
   headers: { 'Content-Type': 'application/json' },
 })
@@ -11,7 +13,7 @@ let refreshPromise: Promise<void> | null = null
 
 async function doRefresh(): Promise<void> {
   // Refresh token is in HttpOnly cookie — sent automatically, no body needed
-  await axios.post('/auth/refresh', {}, { withCredentials: true })
+  await axios.post(`${API_BASE}auth/refresh`, {}, { withCredentials: true })
 }
 
 client.interceptors.response.use(
