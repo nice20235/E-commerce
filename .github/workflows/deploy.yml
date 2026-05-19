@@ -5,9 +5,6 @@ on:
     branches: [main, master]
 
 jobs:
-  # ──────────────────────────────
-  # 1. Backend deploy
-  # ──────────────────────────────
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
@@ -21,13 +18,11 @@ jobs:
           script: |
             cd /var/www/backend/StepUp
             git pull
+            cd BackEnd
             source venv/bin/activate
             pip install -r requirements.txt
             systemctl restart backend
 
-  # ──────────────────────────────
-  # 2. Frontend build + deploy
-  # ──────────────────────────────
   deploy-frontend:
     name: Build & Deploy Frontend
     runs-on: ubuntu-latest
@@ -50,9 +45,6 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
 
-      # Copy built files to VPS
-      # VPS_FRONTEND_PATH — nginx root papkasi, masalan: /var/www/frontend/dist
-      # Qanday topish: VPS'da → grep -r "root" /etc/nginx/sites-enabled/
       - name: Upload dist to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
