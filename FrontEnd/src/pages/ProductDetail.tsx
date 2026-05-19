@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProduct } from '../api/products'
 import { addToCart } from '../api/cart'
+import { getImageUrl } from '../utils/image'
 import { useAuthStore } from '../store/auth'
 import { useLang } from '../store/lang'
 
@@ -82,8 +83,8 @@ export default function ProductDetail() {
   }
 
   const allImages = product.images && product.images.length > 0
-    ? product.images.map((img) => img.image_path)
-    : product.image ? [product.image] : []
+    ? product.images.map((img) => getImageUrl(img.image_path))
+    : product.image ? [getImageUrl(product.image)] : []
 
   const currentImage = allImages[selectedImage] ?? null
 

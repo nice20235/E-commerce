@@ -5,6 +5,7 @@ import { createOrderFromCart, initPayment } from '../api/orders'
 import { useState } from 'react'
 import type { Order } from '../types'
 import { useLang } from '../store/lang'
+import { getImageUrl } from '../utils/image'
 import { extractApiError } from '../api/errors'
 
 export default function Checkout() {
@@ -158,7 +159,7 @@ export default function Checkout() {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f0ede8' }}>
                   {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <svg className="w-4 h-4" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

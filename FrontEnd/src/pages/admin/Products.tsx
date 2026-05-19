@@ -4,6 +4,7 @@ import { getProducts, createProduct, updateProduct, deleteProduct, uploadProduct
 import type { Product } from '../../types'
 import { useLang } from '../../store/lang'
 import { extractApiError } from '../../api/errors'
+import { getImageUrl } from '../../utils/image'
 
 interface FormData { name: string; size: string; price: string; quantity: string }
 const emptyForm: FormData = { name: '', size: '', price: '', quantity: '' }
@@ -351,7 +352,7 @@ export default function AdminProducts() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3 min-w-0">
                       {product.image ? (
-                        <img src={product.image} alt={product.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" style={{ background: '#f0ede8' }} />
+                        <img src={getImageUrl(product.image)} alt={product.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" style={{ background: '#f0ede8' }} />
                       ) : (
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#f0ede8' }}>
                           <svg className="w-5 h-5" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,7 +453,7 @@ export default function AdminProducts() {
                 {/* Top row: image + name + stock */}
                 <div className="flex items-center gap-3 mb-3">
                   {product.image ? (
-                    <img src={product.image} alt={product.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ background: '#f0ede8' }} />
+                    <img src={getImageUrl(product.image)} alt={product.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ background: '#f0ede8' }} />
                   ) : (
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#f0ede8' }}>
                       <svg className="w-6 h-6" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

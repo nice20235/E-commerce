@@ -3,6 +3,7 @@ import { getOrders } from '../api/orders'
 import { Link } from 'react-router-dom'
 import type { Order } from '../types'
 import { useLang } from '../store/lang'
+import { getImageUrl } from '../utils/image'
 
 const STATUS_CONFIG: Record<Order['status'], {
   dotColor: string
@@ -140,7 +141,7 @@ export default function Orders() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         {item.image ? (
                           <img
-                            src={item.image}
+                            src={getImageUrl(item.image)}
                             alt={item.name ?? ''}
                             className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
                             style={{ background: '#f0ede8' }}

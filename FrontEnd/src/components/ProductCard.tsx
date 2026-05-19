@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/auth'
 import { useNavigate } from 'react-router-dom'
 import type { Product } from '../types'
 import { useLang } from '../store/lang'
+import { getImageUrl } from '../utils/image'
 
 export default function ProductCard({ product }: { product: Product }) {
   const { isAuthenticated } = useAuthStore()
@@ -43,7 +44,7 @@ export default function ProductCard({ product }: { product: Product }) {
       >
         {product.image ? (
           <img
-            src={product.image}
+            src={getImageUrl(product.image)}
             alt={product.name}
             loading="lazy"
             className="card-img w-full h-full object-cover"
