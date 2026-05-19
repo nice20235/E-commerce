@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
+import { getMe } from './api/users'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -20,11 +21,26 @@ import AllOrders from './pages/admin/AllOrders'
 import AdminUsers from './pages/admin/Users'
 
 export default function App() {
-  const { initFromStorage } = useAuthStore()
+  const { initFromStorage, isAuthenticated, user, setAuth } = useAuthStore()
 
   useEffect(() => {
     initFromStorage()
   }, [initFromStorage])
+
+  // After restoring session from storage, fetch /users/me to get the real
+  // is_admin value (not persisted in localStorage for security reasons).
+  useEffect(() => {
+    if (isAuthenticated && user && !user.is_admin) {
+      getMe().then((profile) => {
+        if (profile.is_admin) {
+          setAuth({ ...user, ...profile })
+        }
+      }).catch(() => {
+        // Silently ignore — user stays logged in with display-only data.
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   return (
     <Layout>

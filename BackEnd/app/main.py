@@ -50,27 +50,14 @@ START_TIME = time.time()
 
 
 async def warm_up_cache() -> None:
-    """Warm up critical cache entries (e.g., product catalog) on startup.
+    """Verify DB connectivity on startup by running a lightweight query.
 
-    This makes the first user request to the catalog fast, since the
-    `/stepups` list endpoint is already cached in memory.
+    The stepups catalog endpoint no longer uses @cached, so pre-fetching
+    the first page would only warm the connection pool — not the cache.
+    The health-check probe in lifespan already covers DB connectivity, so
+    this function is kept as a no-op to preserve the call site.
     """
-
-    try:
-        async with AsyncSessionLocal() as db:
-            # Preload the most common catalog view: first page, default sort,
-            # no filters. This goes through the @cached wrapper on
-            # `read_slippers`, so the result is stored in the in-memory cache.
-            await stepups.read_slippers(
-                skip=0,
-                limit=20,
-                search=None,
-                sort="id_desc",
-                db=db,
-            )
-        logger.info("✅ Warmed up product catalog cache (stepups)")
-    except Exception as e:  # pragma: no cover - best-effort startup optimization
-        logger.warning(f"Cache warmup failed: {e}")
+    pass
 
 # Application lifespan manager
 @asynccontextmanager
@@ -198,15 +185,15 @@ async def rate_limit_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     path = request.url.path
-    if path in _exclude:
+    if any(path == p or path.startswith(p + "/") for p in _exclude):
         return await call_next(request)
 
     # Identify client IP
     if settings.TRUST_PROXY:
         fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(',')[0].strip() if fwd else request.client.host
+        client_ip = fwd.split(',')[0].strip() if fwd else (request.client.host if request.client else "unknown")
     else:
-        client_ip = request.client.host
+        client_ip = request.client.host if request.client else "unknown"
 
     now = time.time()
     window = settings.RATE_LIMIT_WINDOW_SEC
@@ -226,6 +213,11 @@ async def rate_limit_middleware(request: Request, call_next):
             }
         )
     dq.append(now)
+    # Periodically evict stale entries to prevent unbounded memory growth.
+    if len(_req_log) > 10_000:
+        stale = [ip for ip, q in list(_req_log.items()) if not q or now - q[-1] > window]
+        for ip in stale:
+            _req_log.pop(ip, None)
     remaining = max(0, limit - len(dq))
     response = await call_next(request)
     response.headers["X-RateLimit-Limit"] = str(limit)
@@ -242,6 +234,10 @@ app.add_middleware(CORSMiddleware, **cors_kwargs)
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler for better error responses"""
+    from fastapi import HTTPException as _HTTPException
+    if isinstance(exc, _HTTPException):
+        raise exc
+    logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
         status_code=500,
         content={

@@ -54,7 +54,7 @@ export default function AdminProducts() {
       name: form.name,
       size: form.size,
       price: parseFloat(form.price),
-      quantity: parseInt(form.quantity),
+      quantity: parseInt(form.quantity, 10),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
@@ -67,12 +67,15 @@ export default function AdminProducts() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: () => updateProduct(editId!, {
-      name: form.name,
-      size: form.size,
-      price: parseFloat(form.price),
-      quantity: parseInt(form.quantity),
-    }),
+    mutationFn: () => {
+      if (editId === null) throw new Error('No product selected for update')
+      return updateProduct(editId, {
+        name: form.name,
+        size: form.size,
+        price: parseFloat(form.price),
+        quantity: parseInt(form.quantity, 10),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' })
@@ -121,8 +124,18 @@ export default function AdminProducts() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!form.name || !form.size || !form.price || !form.quantity) {
+    if (!form.name.trim() || !form.size.trim() || !form.price || !form.quantity) {
       setError(t('allRequired'))
+      return
+    }
+    const price = parseFloat(form.price)
+    const quantity = parseInt(form.quantity, 10)
+    if (isNaN(price) || price <= 0) {
+      setError(t('price') + ': invalid value')
+      return
+    }
+    if (isNaN(quantity) || quantity < 0) {
+      setError(t('stock') + ': invalid value')
       return
     }
     editId ? updateMutation.mutate() : createMutation.mutate()

@@ -200,6 +200,7 @@ async def create_order(
         if it.slipper_id not in item_ids:
             item_ids.append(it.slipper_id)
 
+    step_by_id: dict[int, tuple[int, float]] = {}
     if item_ids:
         rows = await db.execute(select(StepUp.id, StepUp.quantity, StepUp.price).where(StepUp.id.in_(item_ids)))
         step_by_id = {int(r[0]): (int(r[1] or 0), float(r[2] or 0.0)) for r in rows.all()}
@@ -213,21 +214,21 @@ async def create_order(
                     f"Requested quantity exceeds available stock for item {sid} (requested={qty}, available={available})"
                 )
 
-    # Calculate total amount in tiyin (1 UZS = 100 tiyin)
+    # Calculate total amount in tiyin (1 UZS = 100 tiyin).
+    # Prices were already fetched in the batch validation step above; reuse
+    # step_by_id to avoid an N+1 query loop (one SELECT per order item).
     total_amount_tiyin = 0
     order_items = []
-    
+
     for item_data in order.items:
-        # Get stepup to verify it exists and get current price
-        slipper_result = await db.execute(select(StepUp).where(StepUp.id == item_data.slipper_id))
-        slipper = slipper_result.scalar_one_or_none()
-        if not slipper:
+        if item_data.slipper_id not in step_by_id:
             raise ValueError(f"StepUp with ID {item_data.slipper_id} not found")
+        _available, _unit_price = step_by_id[item_data.slipper_id]
         # Quantity is only limited by actual stock (validated earlier)
         qty = int(item_data.quantity)
 
-        # Use current slipper price in UZS
-        unit_price = slipper.price  # in UZS
+        # Use current slipper price in UZS (sourced from batch fetch above)
+        unit_price = _unit_price  # in UZS
         total_price = unit_price * qty  # in UZS
         # Accumulate total in tiyin to satisfy bank requirements
         price_tiyin = int(round(unit_price * 100))

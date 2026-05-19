@@ -19,7 +19,10 @@ export default function Checkout() {
   const { data, isLoading } = useQuery({ queryKey: ['cart'], queryFn: getCart })
 
   const orderMutation = useMutation({
-    mutationFn: () => createOrderFromCart(data!.data.id, data!.data.total_amount),
+    mutationFn: () => {
+      if (!data?.data) throw new Error('Cart data unavailable')
+      return createOrderFromCart(data.data.id, data.data.total_amount)
+    },
     onSuccess: (order) => {
       setCreatedOrder(order)
       queryClient.invalidateQueries({ queryKey: ['cart'] })

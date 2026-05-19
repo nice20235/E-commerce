@@ -118,7 +118,7 @@ class BasicAuthRPCMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Apply Basic Auth protection only for the /rpc endpoint
-        if request.url.path != "/rpc":
+        if not request.url.path.startswith("/api/rpc"):
             return await call_next(request)
 
         auth_header = request.headers.get("authorization") or request.headers.get(

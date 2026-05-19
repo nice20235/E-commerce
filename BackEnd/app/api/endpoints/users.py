@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
-@cached(ttl=180, key_prefix="users")
 async def list_users(
     skip: int = Query(0, ge=0, description="Skip items for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Limit items per page"),
@@ -86,7 +85,6 @@ async def get_own_profile(
  
 
 @router.get("/{user_id:int}")
-@cached(ttl=300, key_prefix="user")
 async def get_user_detail(user_id: int, db: AsyncSession = Depends(get_db), admin=Depends(get_current_admin)):
     """
     Get user details by ID. Admin-only endpoint.

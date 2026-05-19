@@ -20,7 +20,8 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    const isAuthEndpoint = (original?.url as string | undefined)?.startsWith('/auth/')
+    const originalUrl = (original?.url as string | undefined) ?? ''
+    const isAuthEndpoint = originalUrl.includes('/auth/') || originalUrl.startsWith('auth/')
 
     if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true

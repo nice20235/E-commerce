@@ -10,7 +10,8 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     if not hashed.startswith("$2"):
-        # Legacy plaintext — support migration period; remove after all users re-login.
-        # Use hmac.compare_digest to prevent timing attacks during the migration window.
-        return hmac.compare_digest(plain, hashed)
+        # Legacy plaintext — reject outright. Plaintext passwords must not be
+        # accepted; require a bcrypt-hashed value so that any admin-seeded
+        # accounts with plain hashes cannot be used to authenticate.
+        return False
     return _ctx.verify(plain, hashed)

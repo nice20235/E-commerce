@@ -93,8 +93,9 @@ def cached(ttl: int = 60, key_prefix: str = ""):  # Reduced from 300 to 60 secon
                 return cached_result
 
             result = await func(*args, **kwargs)
-            # Fire-and-forget style set (no await) would risk race; keep await for correctness.
-            await cache.set(cache_key, result, ttl)
+            # Only cache successful (non-None) results to avoid caching transient failures.
+            if result is not None:
+                await cache.set(cache_key, result, ttl)
             return result
         
         return wrapper

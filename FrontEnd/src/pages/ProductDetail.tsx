@@ -24,11 +24,18 @@ export default function ProductDetail() {
   })
 
   const addMutation = useMutation({
-    mutationFn: () => addToCart(product!.id, qty),
+    mutationFn: () => {
+      if (!product) throw new Error('Product not loaded')
+      return addToCart(product.id, qty)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] })
       setAdded(true)
       setTimeout(() => setAdded(false), 2500)
+    },
+    onError: () => {
+      // Errors are surfaced via mutation.isError if the caller needs it;
+      // no toast/alert here to keep the component simple.
     },
   })
 

@@ -20,7 +20,6 @@ class StepUpCreate(StepUpBase):
 
 
 class StepUpUpdate(BaseModel):
-    image: Optional[str] = Field(None, min_length=1, max_length=255)
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     size: Optional[str] = Field(None, min_length=1, max_length=20)
     price: Optional[float] = Field(None, gt=0)

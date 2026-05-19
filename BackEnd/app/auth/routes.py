@@ -120,7 +120,12 @@ async def login_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
+    from app.core.config import settings as _settings
+    if _settings.TRUST_PROXY:
+        fwd = request.headers.get("x-forwarded-for")
+        client_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    else:
+        client_ip = request.client.host if request.client else "unknown"
     check_login_rate_limit(user_credentials.name, client_ip)
     user = await get_user_by_name(db, user_credentials.name)
     if not user or not verify_password(user_credentials.password, user.password_hash):
@@ -154,13 +159,6 @@ async def refresh_token(
         except Exception:
             pass
 
-    if not refresh_token_value:
-        refresh_token_value = (
-            request.headers.get("Refresh-Token") or
-            request.headers.get("refresh-token") or
-            request.headers.get("X-Refresh-Token")
-        )
-    
     if not refresh_token_value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

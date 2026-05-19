@@ -51,8 +51,6 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
                 parts = header_auth.split()
                 if len(parts) == 2 and parts[0].lower() == "bearer":
                     token_to_use = parts[1].strip()
-                elif len(parts) == 1:
-                    token_to_use = parts[0].strip()
 
         if not token_to_use:
             raise credentials_exception

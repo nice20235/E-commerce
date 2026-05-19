@@ -183,10 +183,10 @@ async def list_orders(
     try:
         if user.is_admin:
             logger.info(f"Admin {user.name} listing ALL orders")
-            orders, total = await get_orders(db, skip=0, limit=100000, load_relationships=False)
+            orders, total = await get_orders(db, skip=0, limit=10000, load_relationships=False)
         else:
             logger.info(f"User {user.name} listing OWN orders")
-            orders, total = await get_orders(db, skip=0, limit=100000, user_id=user.id, load_relationships=False)
+            orders, total = await get_orders(db, skip=0, limit=1000, user_id=user.id, load_relationships=False)
 
         # Batch load users and items for these orders to avoid N+1
         order_ids = [o.id for o in orders]

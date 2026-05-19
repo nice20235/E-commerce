@@ -115,7 +115,7 @@ export default function AdminLayout() {
 
           {/* Current page label */}
           <span className="text-sm font-semibold text-white">
-            {links.find(l => isActive(l.to)) ? t(links.find(l => isActive(l.to))!.labelKey) : t('admin')}
+            {t(links.find(l => isActive(l.to))?.labelKey ?? 'admin')}
           </span>
 
           {/* Hamburger / close */}
