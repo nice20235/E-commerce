@@ -18,7 +18,9 @@ async def _reload_cart(db: AsyncSession, cart_id: int) -> Cart:
         .where(Cart.id == cart_id)
         .options(*_cart_with_items())
     )
-    return q.scalar_one()
+    cart = q.scalar_one()
+    cart.items.sort(key=lambda ci: ci.id)
+    return cart
 
 async def get_or_create_cart(db: AsyncSession, user_id: int) -> Cart:
     # Deterministically pick the oldest cart if duplicates exist (data repair may still be running)
@@ -30,6 +32,7 @@ async def get_or_create_cart(db: AsyncSession, user_id: int) -> Cart:
     )
     cart = q.scalar_one_or_none()
     if cart:
+        cart.items.sort(key=lambda ci: ci.id)
         return cart
     cart = Cart(user_id=user_id)
     db.add(cart)
@@ -44,7 +47,10 @@ async def get_cart(db: AsyncSession, user_id: int) -> Optional[Cart]:
         .limit(1)
         .options(*_cart_with_items())
     )
-    return q.scalars().first()
+    cart = q.scalars().first()
+    if cart:
+        cart.items.sort(key=lambda ci: ci.id)
+    return cart
 
 async def add_item(db: AsyncSession, user_id: int, item: CartItemCreate) -> Cart:
     cart = await get_or_create_cart(db, user_id)
