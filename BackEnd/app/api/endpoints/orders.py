@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -220,7 +219,8 @@ async def list_orders(
                 })
             return by_order
 
-        users_by_id, items_by_order = await asyncio.gather(_fetch_users(), _fetch_items())
+        users_by_id = await _fetch_users()
+        items_by_order = await _fetch_items()
 
         result = [
             {

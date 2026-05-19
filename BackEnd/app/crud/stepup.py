@@ -5,7 +5,6 @@ from sqlalchemy import func, and_, or_
 from app.models.stepup import StepUp
 from app.schemas.stepup import StepUpCreate, StepUpUpdate
 from typing import Optional, List, Tuple
-import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,12 +56,9 @@ async def get_slippers(
     if conditions:
         count_query = count_query.where(and_(*conditions))
 
-    # Execute count and data queries concurrently
-    count_result, data_result = await asyncio.gather(
-        db.execute(count_query),
-        db.execute(data_query),
-    )
+    count_result = await db.execute(count_query)
     total = int(count_result.scalar() or 0)
+    data_result = await db.execute(data_query)
     items = data_result.scalars().all()
     return items, total
 

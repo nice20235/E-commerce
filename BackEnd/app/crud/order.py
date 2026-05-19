@@ -7,7 +7,6 @@ from app.models.stepup import StepUp
 from app.schemas.order import OrderCreate, OrderUpdate, OrderItemCreate
 from app.core.cache import invalidate_cache_pattern
 from typing import Optional, List, Tuple
-import asyncio
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -75,13 +74,9 @@ async def get_orders(
             selectinload(Order.items).selectinload(OrderItem.slipper)
         )
 
-    # Execute count and data concurrently
-    count_result, data_result = await asyncio.gather(
-        db.execute(count_query),
-        db.execute(data_query),
-    )
+    count_result = await db.execute(count_query)
     total = count_result.scalar() or 0
-    # Ensure uniqueness when eager loaders are involved
+    data_result = await db.execute(data_query)
     orders = data_result.unique().scalars().all()
 
     return orders, total
