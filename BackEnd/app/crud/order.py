@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
@@ -17,12 +18,15 @@ logger = logging.getLogger(__name__)
 def _compute_total_tiyin_from_items(items: list[OrderItem]) -> int:
     """Compute total amount in tiyin from a list of OrderItems.
 
-    OrderItem.total_price is stored in UZS (float). The acquiring/bank protocol
+    OrderItem.total_price is stored in UZS as Decimal. The acquiring/bank protocol
     expects integer amounts in tiyin, so we multiply by 100 and round.
     """
 
-    total_uzs = sum(float(it.total_price or 0.0) for it in (items or []))
-    return int(round(total_uzs * 100))
+    total_uzs = sum(
+        (it.total_price if it.total_price is not None else Decimal("0"))
+        for it in (items or [])
+    )
+    return int(round(float(total_uzs) * 100))
 
 async def get_order(db: AsyncSession, order_id: int, load_relationships: bool = True) -> Optional[Order]:
     """Get order by ID with optional relationship loading"""
@@ -137,7 +141,7 @@ async def create_order(
     if merge_target is not None:
         # Build index of existing items by slipper_id
         existing_by_slipper = {it.slipper_id: it for it in (merge_target.items or [])}
-        new_items_total = 0.0
+        new_items_total: Decimal = Decimal("0")
         # For each incoming item, merge into existing or create new
         for item_data in order.items:
             slipper = (await db.execute(select(StepUp).where(StepUp.id == item_data.slipper_id))).scalar_one_or_none()
@@ -169,9 +173,9 @@ async def create_order(
                 db.add(oi)
                 new_items_total += oi.total_price
         # Recalculate total_amount in tiyin (sum of item totals in UZS * 100)
-        current_total_uzs = sum((it.total_price or 0.0) for it in (merge_target.items or []))
+        current_total_uzs = sum((it.total_price or Decimal("0")) for it in (merge_target.items or []))
         merged_total_uzs = current_total_uzs + new_items_total
-        merge_target.total_amount = int(round(merged_total_uzs * 100))
+        merge_target.total_amount = int(round(float(merged_total_uzs) * 100))
         db.add(merge_target)
         await db.commit()
         await db.refresh(merge_target)
@@ -208,10 +212,10 @@ async def create_order(
         if it.slipper_id not in item_ids:
             item_ids.append(it.slipper_id)
 
-    step_by_id: dict[int, tuple[int, float]] = {}
+    step_by_id: dict[int, tuple[int, Decimal]] = {}
     if item_ids:
         rows = await db.execute(select(StepUp.id, StepUp.quantity, StepUp.price).where(StepUp.id.in_(item_ids)))
-        step_by_id = {int(r[0]): (int(r[1] or 0), float(r[2] or 0.0)) for r in rows.all()}
+        step_by_id = {int(r[0]): (int(r[1] or 0), Decimal(str(r[2] or "0"))) for r in rows.all()}
         # Verify all exist and stock is sufficient
         for sid, qty in requested.items():
             if sid not in step_by_id:

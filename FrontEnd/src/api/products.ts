@@ -49,5 +49,11 @@ export const uploadProductImages = (id: number, files: File[]) => {
 export const deleteProductImage = (productId: number, imageId: number) =>
   client.delete(`/stepups/${productId}/images/${imageId}`).then((r) => r.data)
 
+export interface ProductImagesResponse {
+  slipper_id: number
+  images: ProductImage[]
+  total_images: number
+}
+
 export const getProductImages = (id: number) =>
-  client.get<ProductImage[]>(`/stepups/${id}/images`).then((r) => r.data)
+  client.get<ProductImagesResponse>(`/stepups/${id}/images`).then((r) => r.data)

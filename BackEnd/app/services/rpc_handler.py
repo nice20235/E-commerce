@@ -442,11 +442,18 @@ class RpcHandler:
                 OrderItemCreate(
                     slipper_id=ci.slipper_id,
                     quantity=int(ci.quantity),
-                    unit_price=float(slippers_map[ci.slipper_id].price) if ci.slipper_id in slippers_map else 0.0,
+                    unit_price=float(slippers_map[ci.slipper_id].price),
                     notes=None,
                 )
                 for ci in items
+                if ci.slipper_id in slippers_map
             ]
+            if not items_source:
+                self._logger.warning(
+                    "No valid cart items found for %s (all products missing from DB, tx=%s)",
+                    cart_ref, getattr(tx, "id", None),
+                )
+                return
             internal_order = OrderCreate(
                 order_id=None,
                 user_id=cart.user_id,
