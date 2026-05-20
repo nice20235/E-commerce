@@ -174,12 +174,11 @@ async def rate_limit_middleware(request: Request, call_next):
         return await call_next(request)
 
     # Identify client IP.
-    # Use rightmost entry from X-Forwarded-For: the trusted proxy appends the
-    # real client IP at the rightmost position, so it cannot be spoofed by the
-    # client (who can prepend arbitrary values to the leftmost position).
+    # Prefer X-Real-IP (set by nginx from $remote_addr — cannot be spoofed).
+    # Fall back to the direct TCP connection address when running without a proxy.
     if settings.TRUST_PROXY:
-        fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(',')[-1].strip() if fwd else (request.client.host if request.client else "unknown")
+        real_ip = request.headers.get("x-real-ip")
+        client_ip = real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
     else:
         client_ip = request.client.host if request.client else "unknown"
 
@@ -211,6 +210,7 @@ async def rate_limit_middleware(request: Request, call_next):
             stale = [ip for ip, q in list(_req_log.items()) if not q or now - q[-1] > window]
             for ip in stale:
                 _req_log.pop(ip, None)
+                _rate_limit_locks.pop(ip, None)
     remaining = max(0, limit - len(dq))
     response = await call_next(request)
     response.headers["X-RateLimit-Limit"] = str(limit)

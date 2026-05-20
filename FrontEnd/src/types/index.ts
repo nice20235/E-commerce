@@ -49,9 +49,17 @@ export interface CartItem {
   image: string | null
 }
 
+export interface UnavailableCartItem {
+  product_id: number
+  name: string
+  quantity: number
+  unavailable: true
+}
+
 export interface CartData {
   id: string
   items: CartItem[]
+  unavailable_items: UnavailableCartItem[]
   total_amount: number
   currency: string
   items_count: number

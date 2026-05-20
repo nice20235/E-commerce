@@ -27,6 +27,7 @@ class CurrentUser(BaseModel):
     surname: str | None = None
     phone_number: str | None = None
     is_admin: bool
+    token_version: int = 0
 
 
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)) -> CurrentUser:
@@ -73,21 +74,25 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
                 )
         
         user_id: int = int(payload["sub"])
+        jwt_token_version = int(payload.get("token_version", 0))
 
         # Try to read user context from in-memory cache first to avoid a DB query
         cache_key = f"user:{user_id}"
         cached_user = await cache.get(cache_key)
         if cached_user is not None:
-            # Cached value is a plain Pydantic model (or dict), never a SQLAlchemy instance
-            if isinstance(cached_user, CurrentUser):
-                logger.info(f"User authenticated from cache: id={user_id}")
-                return cached_user
             try:
-                user_ctx = CurrentUser.model_validate(cached_user)
+                user_ctx = cached_user if isinstance(cached_user, CurrentUser) else CurrentUser.model_validate(cached_user)
+                # Verify the access token's version matches what's cached.
+                # On logout the cache entry is cleared, so a stale token will
+                # miss here and fall through to the DB check below.
+                if jwt_token_version != user_ctx.token_version:
+                    logger.warning(f"Token version mismatch (cached) for user {user_id}: jwt={jwt_token_version} cached={user_ctx.token_version}")
+                    raise credentials_exception
                 logger.info(f"User authenticated from cache: id={user_id}")
                 return user_ctx
+            except HTTPException:
+                raise
             except Exception:
-                # Fallback to DB if cache data is in an unexpected format
                 logger.warning("Cached user data had unexpected format; falling back to DB lookup")
 
         # Fallback to database lookup and populate cache with a detached value object
@@ -97,12 +102,18 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
             logger.warning(f"User not found: {user_id}")
             raise credentials_exception
 
+        # Reject access tokens that were issued before the last logout
+        if jwt_token_version != db_user.token_version:
+            logger.warning(f"Token version mismatch (DB) for user {user_id}: jwt={jwt_token_version} db={db_user.token_version}")
+            raise credentials_exception
+
         user_ctx = CurrentUser(
             id=db_user.id,
             name=db_user.name,
             surname=db_user.surname,
             phone_number=db_user.phone_number,
             is_admin=db_user.is_admin,
+            token_version=db_user.token_version,
         )
 
         await cache.set(cache_key, user_ctx, ttl=_settings.USER_CACHE_TTL_SEC)

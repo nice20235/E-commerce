@@ -91,8 +91,27 @@ export default function Cart() {
     )
   }
 
+  const unavailable = cart?.unavailable_items ?? []
+
   return (
     <div className="max-w-2xl mx-auto">
+      {/* Unavailable items warning */}
+      {unavailable.length > 0 && (
+        <div className="mb-4 rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#ea580c' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: '#9a3412' }}>
+              {unavailable.length === 1 ? '1 item is no longer available' : `${unavailable.length} items are no longer available`}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#c2410c' }}>
+              {unavailable.map(i => i.name).join(', ')} — removed from your cart
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-5 sm:mb-8">
         <div>

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
-import hashlib
+import hashlib  # noqa: S324 — sha256 used below; md5 not used
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.schemas.order import (
@@ -104,9 +104,9 @@ async def create_order_from_cart(
 
     # Generate a stable idempotency key so duplicate submissions (double-click,
     # retry) return the same order rather than creating a second one.
-    idempotency_key = hashlib.md5(
+    idempotency_key = hashlib.sha256(
         f"{user.id}:{payload.cart_id}:{round(total_amount)}".encode()
-    ).hexdigest()
+    ).hexdigest()[:64]
 
     internal_order = OrderCreate(
         order_id=None,
