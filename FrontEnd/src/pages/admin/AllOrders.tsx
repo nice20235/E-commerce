@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getOrders } from '../../api/orders'
 import type { Order } from '../../types'
@@ -28,20 +28,35 @@ function formatDate(raw: string): string {
   }
 }
 
+const ITEMS_PER_PAGE = 50
+
 export default function AllOrders() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<Order['status'] | 'ALL'>('ALL')
+  const [page, setPage] = useState(0)
   const { t, lang } = useLang()
 
-  const { data: orders, isLoading, isError } = useQuery({
-    queryKey: ['orders', 'admin'],
-    queryFn: getOrders,
+  const { data: ordersData, isLoading, isError } = useQuery({
+    queryKey: ['orders', 'admin', page, filterStatus],
+    queryFn: () => getOrders(
+      page * ITEMS_PER_PAGE,
+      ITEMS_PER_PAGE,
+      filterStatus === 'ALL' ? undefined : filterStatus,
+    ),
     staleTime: 15_000,
+    placeholderData: (prev) => prev,
   })
 
-  const filtered = orders?.filter(
-    (o) => filterStatus === 'ALL' || o.status === filterStatus
-  )
+  const allOrders = ordersData?.orders ?? []
+  const serverTotal = ordersData?.total ?? 0
+
+  // Status filter is applied server-side; allOrders is already filtered
+  const pageOrders = allOrders
+
+  // Reset to first page whenever the filter changes
+  useEffect(() => {
+    setPage(0)
+  }, [filterStatus])
 
   const filterLabel = (s: Order['status'] | 'ALL') => {
     if (s === 'ALL') return lang === 'uz' ? 'Barchasi' : 'Все'
@@ -88,7 +103,12 @@ export default function AllOrders() {
         <div>
           <h1 className="text-lg sm:text-xl font-black" style={{ color: '#1a2f4e' }}>{t('allOrders')}</h1>
           <p className="text-sm mt-0.5" style={{ color: '#888' }}>
-            {filtered?.length ?? 0} {lang === 'uz' ? 'ta buyurtma' : 'заказов'}
+            {serverTotal} {lang === 'uz' ? 'ta buyurtma' : 'заказов'}
+            {(serverTotal) > ITEMS_PER_PAGE && (
+              <span style={{ color: '#bbb' }}>
+                {' '}({lang === 'uz' ? `Sahifa ${page + 1}` : `Страница ${page + 1}`})
+              </span>
+            )}
           </p>
         </div>
 
@@ -140,7 +160,7 @@ export default function AllOrders() {
       </div>
 
       {/* Empty state */}
-      {!filtered?.length && (
+      {!pageOrders.length && (
         <div className="rounded-2xl p-10 sm:p-12 text-center" style={{ background: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: '#f0ede8' }}>
             <svg className="w-7 h-7" style={{ color: '#ccc' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,9 +172,9 @@ export default function AllOrders() {
       )}
 
       {/* Orders list */}
-      {!!filtered?.length && (
+      {!!pageOrders?.length && (
         <div className="space-y-3">
-          {filtered.map((order) => {
+          {pageOrders.map((order) => {
             const numericId = parseInt(order.order_id.replace('order_', ''), 10)
             const isExpanded = expandedId === order.order_id
             const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING
@@ -265,6 +285,31 @@ export default function AllOrders() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Pagination controls */}
+      {(serverTotal) > ITEMS_PER_PAGE && (
+        <div className="flex items-center gap-4 mt-4">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+          >
+            {lang === 'uz' ? 'Oldingi' : 'Назад'}
+          </button>
+          <span className="text-sm" style={{ color: '#888' }}>
+            {lang === 'uz'
+              ? `Sahifa ${page + 1} / ${Math.ceil(serverTotal / ITEMS_PER_PAGE)}`
+              : `Страница ${page + 1} из ${Math.ceil(serverTotal / ITEMS_PER_PAGE)}`}
+          </span>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={(page + 1) * ITEMS_PER_PAGE >= (serverTotal)}
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+          >
+            {lang === 'uz' ? 'Keyingi' : 'Вперёд'}
+          </button>
         </div>
       )}
     </div>

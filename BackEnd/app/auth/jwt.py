@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from jwt.exceptions import InvalidTokenError
 from app.core.config import settings
@@ -29,21 +29,23 @@ def _calc_session_exp(now: datetime, existing_session_exp: datetime | None = Non
         return existing_session_exp
     return now + timedelta(days=SESSION_MAX_DAYS)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, session_exp: datetime | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, session_exp: datetime | None = None, token_version: int = 0) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire, "type": "access"})
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "type": "access", "token_version": token_version})
     if session_exp is not None:
         to_encode["sess_exp"] = int(session_exp.timestamp())
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None, session_exp: datetime | None = None) -> str:
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None, session_exp: datetime | None = None, token_version: int = 0) -> str:
     """Create JWT refresh token"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
-    to_encode.update({"exp": expire, "type": "refresh"})
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire, "type": "refresh", "token_version": token_version})
     if session_exp is not None:
         to_encode["sess_exp"] = int(session_exp.timestamp())
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -54,22 +56,30 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
 
     PyJWT rejects the 'none' algorithm by default when algorithms is an
     explicit list, preventing algorithm-confusion attacks.
+
+    Returns the full payload dict including 'token_version' (int, default 0).
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "access":
             return None
+        # Normalise token_version so callers can always rely on it being an int
+        payload.setdefault("token_version", 0)
         return payload
     except InvalidTokenError:
         return None
 
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and validate JWT refresh token."""
+    """Decode and validate JWT refresh token.
+
+    Returns the full payload dict including 'token_version' (int, default 0).
+    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             return None
+        # Normalise token_version so callers can always rely on it being an int
+        payload.setdefault("token_version", 0)
         return payload
     except InvalidTokenError:
         return None
-

@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func, and_, or_
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
-from app.auth.password import verify_password, hash_password
+from app.auth.password import hash_password
 from typing import Optional, List, Tuple
 import logging
 
@@ -33,20 +33,6 @@ async def get_user_by_phone_number(db: AsyncSession, phone_number: str) -> Optio
     )
     return result.scalar_one_or_none()
 
-async def authenticate_user(db: AsyncSession, name: str, password: str) -> Optional[User]:
-    """Authenticate user by name and password - optimized query"""
-    result = await db.execute(
-        select(User).where(User.name == name)
-    )
-    user = result.scalar_one_or_none()
-    if not user or not verify_password(password, user.password_hash):
-        return None
-    # Auto-upgrade legacy plaintext passwords to bcrypt on successful login
-    if not user.password_hash.startswith("$2"):
-        user.password_hash = hash_password(password)
-        db.add(user)
-        await db.commit()
-    return user
 
 async def get_users(
     db: AsyncSession, 

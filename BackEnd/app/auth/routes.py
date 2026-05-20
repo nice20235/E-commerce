@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 import time
 import logging
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.database import get_db
@@ -91,22 +92,52 @@ def check_login_rate_limit(name: str, client_ip: str):
             _login_attempts.pop(k, None)
 
 
+def _check_register_rate_limit(client_ip: str):
+    """Rate-limit registrations to 5 per hour per IP."""
+    now = time.time()
+    window = 3600  # 1 hour
+    limit = 5
+    key = f"register:{client_ip}"
+    dq = _login_attempts[key]
+    while dq and now - dq[0] > window:
+        dq.popleft()
+    if len(dq) >= limit:
+        raise HTTPException(status_code=429, detail="Too many registration attempts. Please try again later.")
+    dq.append(now)
+
+
 @auth_router.post("/register")
 async def register_user(
     user_data: UserCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    # Rate-limit registrations per IP
+    if settings.TRUST_PROXY:
+        fwd = request.headers.get("x-forwarded-for")
+        client_ip = fwd.split(",")[-1].strip() if fwd else (request.client.host if request.client else "unknown")
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+    _check_register_rate_limit(client_ip)
+
     existing_user_by_name = await get_user_by_name(db, user_data.name)
     if existing_user_by_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this name already exists")
     existing_user_by_phone = await get_user_by_phone_number(db, user_data.phone_number)
     if existing_user_by_phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this phone number already exists")
-    user = await create_user(db, user_data)
+
+    try:
+        user = await create_user(db, user_data)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+
     logger.info(f"Created new user: {user.name} ({user.phone_number})")
-    now_session_exp = _calc_session_exp(datetime.utcnow())
-    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
+    now = datetime.now(timezone.utc)
+    now_session_exp = _calc_session_exp(now)
+    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp, token_version=user.token_version)
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp, token_version=user.token_version)
     user_payload = UserResponse.model_validate(user).model_dump()
     user_payload.pop("id", None)
     resp = JSONResponse(content=jsonable_encoder({"user": user_payload}))
@@ -123,16 +154,17 @@ async def login_user(
     from app.core.config import settings as _settings
     if _settings.TRUST_PROXY:
         fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+        client_ip = fwd.split(",")[-1].strip() if fwd else (request.client.host if request.client else "unknown")
     else:
         client_ip = request.client.host if request.client else "unknown"
     check_login_rate_limit(user_credentials.name, client_ip)
     user = await get_user_by_name(db, user_credentials.name)
     if not user or not verify_password(user_credentials.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
-    now_session_exp = _calc_session_exp(datetime.utcnow())
-    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp)
+    now = datetime.now(timezone.utc)
+    now_session_exp = _calc_session_exp(now)
+    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=now_session_exp, token_version=user.token_version)
+    refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=now_session_exp, token_version=user.token_version)
     logger.info(f"User logged in: {user.name} (ID: {user.id})")
     user_payload = UserResponse.model_validate(user).model_dump()
     user_payload.pop("id", None)
@@ -164,7 +196,7 @@ async def refresh_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Refresh token required in request body or headers"
         )
-    
+
     # Decode refresh token
     payload = decode_refresh_token(refresh_token_value)
     if not payload or "sub" not in payload:
@@ -172,6 +204,7 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
+
     # Get user
     user_id = int(payload["sub"])
     user = await get_user(db, user_id)
@@ -180,27 +213,37 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
+
+    # Validate token_version to detect tokens invalidated by logout
+    jwt_token_version = int(payload.get("token_version", 0))
+    if jwt_token_version != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been invalidated. Please log in again.",
+        )
+
     # Preserve original absolute session expiration if present
+    now = datetime.now(timezone.utc)
     sess_exp_ts = payload.get("sess_exp")
     if sess_exp_ts:
-        sess_exp_dt = datetime.utcfromtimestamp(int(sess_exp_ts))
-        if datetime.utcnow() >= sess_exp_dt:
+        sess_exp_dt = datetime.fromtimestamp(int(sess_exp_ts), tz=timezone.utc)
+        if now >= sess_exp_dt:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired. Please log in again.")
     else:
-        sess_exp_dt = _calc_session_exp(datetime.utcnow())
+        sess_exp_dt = _calc_session_exp(now)
 
-    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt)
-    refresh_token = create_refresh_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt)
+    access_token = create_access_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt, token_version=user.token_version)
+    refresh_token_new = create_refresh_token(data={"sub": str(user.id)}, session_exp=sess_exp_dt, token_version=user.token_version)
     logger.info(f"Token refreshed for user: {user.name} (ID: {user.id})")
     user_payload = UserResponse.model_validate(user).model_dump()
     user_payload.pop("id", None)
     resp = JSONResponse(content=jsonable_encoder({"user": user_payload}))
-    _set_auth_cookies(resp, access_token, refresh_token)
+    _set_auth_cookies(resp, access_token, refresh_token_new)
     return resp
 
 @auth_router.post("/logout")
-async def logout(request: Request):
-    """Logout: clear HttpOnly cookies and invalidate in-memory cache for this user."""
+async def logout(request: Request, db: AsyncSession = Depends(get_db)):
+    """Logout: clear HttpOnly cookies, invalidate cache, and increment token_version."""
     try:
         token = request.cookies.get("access_token")
         if token:
@@ -210,8 +253,15 @@ async def logout(request: Request):
                 await cache.clear_pattern(f"user:{user_id}")
                 await invalidate_cache_pattern(f"orders:list:uid={user_id}")
                 logger.info(f"Logged out user {user_id}, cache cleared")
+
+                # Increment token_version to invalidate all previously issued tokens
+                user = await get_user(db, int(user_id))
+                if user:
+                    user.token_version += 1
+                    db.add(user)
+                    await db.commit()
     except Exception as e:
-        logger.warning(f"Logout cache cleanup error: {e}")
+        logger.warning(f"Logout cleanup error: {e}")
 
     resp = JSONResponse(content={"message": "Logged out successfully"})
     _clear_auth_cookies(resp)
@@ -220,9 +270,8 @@ async def logout(request: Request):
 
 @auth_router.post("/forgot-password")
 async def forgot_password():
-    """Password reset via this endpoint is not supported without verification."""
+    """Password reset via this endpoint is not currently available."""
     raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Password reset requires verification. Contact support.",
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Password reset is not currently available. Please contact support.",
     )
-

@@ -82,62 +82,7 @@ async def init_db():
 
         # Create all tables (indexes are automatically created from model definitions)
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables and indexes created successfully!")
-        
-        # Apply data migrations
-        await _apply_data_migrations(conn)
-
-
-async def _apply_data_migrations(conn):
-    """Apply data integrity migrations and cleanups"""
-    try:
-        # Check if there are any orders before attempting migrations
-        result = await conn.execute(text("SELECT COUNT(*) FROM orders"))
-        order_count = result.scalar()
-        
-        if order_count > 0:
-            # Ensure enum contains expected uppercase members before attempting to update
-            # PostgreSQL will raise if we try to set an enum column to a value that isn't registered.
-            for enum_val in ("PENDING", "PAID", "REFUNDED", "CONFIRMED", "PREPARING", "READY", "DELIVERED", "CANCELLED"):
-                try:
-                    # Use ALTER TYPE ... ADD VALUE; IF NOT EXISTS may not be supported on all PG versions,
-                    # so ignore failures if the value already exists or if the DB doesn't support IF NOT EXISTS.
-                    await conn.execute(text(f"ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS '{enum_val}'"))
-                except Exception:
-                    # Best-effort: ignore and continue — update below will still succeed for existing rows
-                    pass
-
-            # Normalize order statuses to uppercase standard values
-            await conn.execute(text("""
-                UPDATE orders 
-                SET status = UPPER(status::text)::orderstatus
-                WHERE status::text IN ('pending', 'paid', 'refunded', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled')
-            """))
-            
-            await conn.execute(text("""
-                UPDATE orders 
-                SET status = 'PAID' 
-                WHERE status IN ('CONFIRMED', 'PREPARING', 'READY', 'DELIVERED')
-            """))
-            
-            await conn.execute(text("""
-                UPDATE orders 
-                SET status = 'PENDING' 
-                WHERE status IN ('CANCELLED') OR status NOT IN ('PENDING', 'PAID', 'REFUNDED')
-            """))
-            
-            # Fix any null or invalid order_id values
-            await conn.execute(text("""
-                UPDATE orders 
-                SET order_id = CAST(id AS TEXT)
-                WHERE order_id IS NULL OR order_id = '' OR order_id = '0'
-            """))
-            
-            logger.info(f"✅ Data migrations applied successfully! ({order_count} orders processed)")
-        else:
-            logger.info("✅ Data migrations skipped (no existing orders)")
-    except Exception as e:
-        logger.warning(f"Data migration warning: {e}")
+        logger.info("Database tables and indexes created successfully!")
 
 # Close database connections
 async def close_db():

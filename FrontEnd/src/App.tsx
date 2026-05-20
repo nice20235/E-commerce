@@ -29,18 +29,18 @@ export default function App() {
 
   // After restoring session from storage, fetch /users/me to get the real
   // is_admin value (not persisted in localStorage for security reasons).
+  // Always re-fetch so demoted admins lose access immediately on session restore.
   useEffect(() => {
-    if (isAuthenticated && user && !user.is_admin) {
+    if (isAuthenticated && user) {
       getMe().then((profile) => {
-        if (profile.is_admin) {
-          setAuth({ ...user, ...profile })
-        }
+        setAuth({ ...user, ...profile })
       }).catch(() => {
         // Silently ignore — user stays logged in with display-only data.
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  // user?.name ensures we only re-run when the logged-in identity changes,
+  // not on every shallow object update, avoiding an infinite loop.
+  }, [isAuthenticated, user?.name, setAuth])
 
   return (
     <Layout>

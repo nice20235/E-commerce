@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
 from datetime import datetime
@@ -40,7 +40,7 @@ class StepUp(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     image: Mapped[str] = mapped_column(String(255), nullable=True)
     size: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    price: Mapped[float] = mapped_column(Float, nullable=False, index=True)
+    price: Mapped[float] = mapped_column(Numeric(precision=12, scale=2), nullable=False, index=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
     category_id: Mapped[int] = mapped_column(
         Integer, 

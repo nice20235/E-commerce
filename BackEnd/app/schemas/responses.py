@@ -1,6 +1,6 @@
 """Lean response schemas (only what is currently used)."""
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 
 class BaseResponse(BaseModel):
@@ -11,7 +11,7 @@ class BaseResponse(BaseModel):
 
 class HealthCheckResponse(BaseResponse):
     status: str = "healthy"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     version: str = "1.0.0"
     database: bool = True
     cache: bool = True
@@ -21,4 +21,4 @@ class ErrorResponse(BaseResponse):
     error_code: str
     message: str
     details: Optional[Dict[str, Any]] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

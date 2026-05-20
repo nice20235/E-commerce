@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, status, Request
 from jwt.exceptions import InvalidTokenError as JWTError
 from pydantic import BaseModel
@@ -63,8 +63,8 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         # Check session expiration if present
         sess_exp_ts = payload.get("sess_exp")
         if sess_exp_ts:
-            sess_exp_dt = datetime.utcfromtimestamp(int(sess_exp_ts))
-            if datetime.utcnow() >= sess_exp_dt:
+            sess_exp_dt = datetime.fromtimestamp(int(sess_exp_ts), tz=timezone.utc)
+            if datetime.now(timezone.utc) >= sess_exp_dt:
                 logger.warning("Session expired, forcing re-login")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

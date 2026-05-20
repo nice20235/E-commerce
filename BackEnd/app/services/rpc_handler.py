@@ -12,6 +12,7 @@ from app.crud.order import update_order_status
 from app.models.transaction import Transaction
 from app.models.order import Order, OrderStatus
 from app.models.cart import Cart
+from app.models.stepup import StepUp
 
 
 # Error codes from specification
@@ -433,9 +434,17 @@ class RpcHandler:
             self._logger.warning("Pending order lookup failed for cart %s: %s", cart_ref, exc)
 
         if matched_order is None:
-            # Create an order from cart.
+            # Fetch actual prices for all cart items before building the order.
+            slipper_ids = [ci.slipper_id for ci in items]
+            price_result = await self.db.execute(select(StepUp).where(StepUp.id.in_(slipper_ids)))
+            slippers_map = {s.id: s for s in price_result.scalars().all()}
             items_source = [
-                OrderItemCreate(slipper_id=ci.slipper_id, quantity=int(ci.quantity), unit_price=1.0, notes=None)
+                OrderItemCreate(
+                    slipper_id=ci.slipper_id,
+                    quantity=int(ci.quantity),
+                    unit_price=float(slippers_map[ci.slipper_id].price) if ci.slipper_id in slippers_map else 0.0,
+                    notes=None,
+                )
                 for ci in items
             ]
             internal_order = OrderCreate(

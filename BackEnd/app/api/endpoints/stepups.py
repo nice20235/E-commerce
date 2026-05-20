@@ -264,10 +264,20 @@ async def upload_slipper_images(
     await asyncio.to_thread(os.makedirs, upload_dir, exist_ok=True)
 
     for i, image in enumerate(images):
+        # Fast path: reject oversized uploads before reading the entire body
+        # into memory. image.size comes from multipart Content-Length header
+        # (set by well-behaved clients); the len(data) check below is the
+        # authoritative fallback for clients that omit it.
+        if image.size and image.size > settings.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Image too large. Max {settings.MAX_IMAGE_SIZE_MB}MB.",
+            )
+
         data = await image.read()
 
-        # Size check must come before magic-byte inspection so we don't read
-        # an unbounded payload into memory first.
+        # Authoritative size check after reading (catches clients that sent no
+        # Content-Length header).
         if len(data) > settings.MAX_IMAGE_SIZE_MB * 1024 * 1024:
             raise HTTPException(
                 status_code=400,

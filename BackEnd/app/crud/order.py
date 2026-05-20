@@ -8,7 +8,7 @@ from app.schemas.order import OrderCreate, OrderUpdate, OrderItemCreate
 from app.core.cache import invalidate_cache_pattern
 from typing import Optional, List, Tuple
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ async def create_order(
     merge_target = None
     if merge_fallback:
         try:
-            cutoff = datetime.utcnow() - timedelta(minutes=5)
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
             merge_q = (
                 select(Order)
                 .where(
@@ -308,20 +308,6 @@ async def create_order(
 
     await db.commit()
     await db.refresh(db_order)
-
-    # Recompute total_amount from DB to ensure perfect accuracy (still in tiyin)
-    recompute_result = await db.execute(
-        select(func.coalesce(func.sum(OrderItem.total_price), 0.0)).where(
-            OrderItem.order_id == db_order.id
-        )
-    )
-    exact_total_uzs = float(recompute_result.scalar() or 0.0)
-    exact_total_tiyin = int(round(exact_total_uzs * 100))
-    if (db_order.total_amount or 0) != exact_total_tiyin:
-        db_order.total_amount = exact_total_tiyin
-        db.add(db_order)
-        await db.commit()
-        await db.refresh(db_order)
 
     # Load relationships for response
     result = await db.execute(

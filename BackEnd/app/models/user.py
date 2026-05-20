@@ -12,11 +12,12 @@ class User(Base):
     __tablename__ = "users"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
     surname: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     phone_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         server_default=func.now(),
@@ -33,11 +34,10 @@ class User(Base):
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="user", cascade="all, delete-orphan")
     carts: Mapped[list["Cart"]] = relationship("Cart", back_populates="user", cascade="all, delete-orphan")
     
-    # Indexes for better query performance
+    # Single-column indexes on name, surname, phone_number are declared at the
+    # column level above (index=True).  Only composite indexes are listed here
+    # to avoid creating duplicate index objects on the same column.
     __table_args__ = (
-        Index('idx_users_name', 'name'),
-        Index('idx_users_surname', 'surname'),
-        Index('idx_users_phone_number', 'phone_number'),
         Index('idx_users_admin', 'is_admin'),
         Index('idx_users_created_at', 'created_at'),
         Index('idx_users_name_surname', 'name', 'surname'),  # Composite for full name search

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
+import hashlib
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.schemas.order import (
@@ -16,7 +17,7 @@ from app.crud.order import (
     delete_order,
 )
 from app.crud.cart import get_cart, get_cart_totals, clear_cart as clear_cart_fn
-from app.models.order import OrderItem
+from app.models.order import OrderItem, OrderStatus
 from app.models.stepup import StepUp
 from app.models.user import User as _User
 from app.core.timezone import format_tashkent_compact
@@ -101,6 +102,12 @@ async def create_order_from_cart(
         for ci in cart.items
     ]
 
+    # Generate a stable idempotency key so duplicate submissions (double-click,
+    # retry) return the same order rather than creating a second one.
+    idempotency_key = hashlib.md5(
+        f"{user.id}:{payload.cart_id}:{round(total_amount)}".encode()
+    ).hexdigest()
+
     internal_order = OrderCreate(
         order_id=None,
         user_id=user.id,
@@ -111,7 +118,7 @@ async def create_order_from_cart(
         new_order = await create_order(
             db,
             internal_order,
-            idempotency_key=None,
+            idempotency_key=idempotency_key,
             merge_fallback=False,
         )
     except ValueError as e:
@@ -166,29 +173,37 @@ async def create_order_from_cart(
 async def list_orders(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    status: str | None = Query(default=None),
 ):
     """List orders.
-    - Regular user: only their own orders.
-    - Admin: all users' orders.
-    Pagination & status filtering removed per request.
+    - Regular user: only their own orders (pagination applies).
+    - Admin: all users' orders with pagination and optional status filter.
     """
-    # Build a per-user cache key that includes only the user id and role so
-    # that (a) different users never share a cache entry, and (b) sensitive
-    # fields (password_hash) are never embedded in a cache key.
-    _cache_key = f"orders:list:uid={user.id}:admin={user.is_admin}"
+    # Parse optional status filter
+    status_filter: OrderStatus | None = None
+    if status is not None:
+        try:
+            status_filter = OrderStatus(status.upper())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status value: {status}")
+
+    # Build a per-user cache key that encodes all query parameters
+    _cache_key = f"orders:list:uid={user.id}:admin={user.is_admin}:skip={skip}:limit={limit}:status={status}"
     _cached = await _cache.get(_cache_key)
     if _cached is not None:
         return _cached
 
     try:
         if user.is_admin:
-            logger.info(f"Admin {user.name} listing ALL orders")
-            orders, total = await get_orders(db, skip=0, limit=10000, load_relationships=False)
+            logger.info(f"Admin {user.name} listing ALL orders (skip={skip}, limit={limit}, status={status})")
+            orders, total = await get_orders(db, skip=skip, limit=limit, status=status_filter, load_relationships=False)
         else:
-            logger.info(f"User {user.name} listing OWN orders")
-            orders, total = await get_orders(db, skip=0, limit=1000, user_id=user.id, load_relationships=False)
+            logger.info(f"User {user.name} listing OWN orders (skip={skip}, limit={limit})")
+            orders, total = await get_orders(db, skip=skip, limit=limit, user_id=user.id, status=status_filter, load_relationships=False)
 
-        # Batch load users and items for these orders concurrently to avoid N+1
+        # Batch load users and items for these orders to avoid N+1
         order_ids = [o.id for o in orders]
         user_ids = list({o.user_id for o in orders})
 
@@ -222,7 +237,7 @@ async def list_orders(
         users_by_id = await _fetch_users()
         items_by_order = await _fetch_items()
 
-        result = [
+        orders_out = [
             {
                 # Public order identifier in the same style as cart_1
                 "order_id": f"order_{order.id}",
@@ -236,8 +251,11 @@ async def list_orders(
             }
             for order in orders
         ]
+        result = {"orders": orders_out, "total": total, "skip": skip, "limit": limit}
         await _cache.set(_cache_key, result, ttl=60)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching orders: {e}")
         raise HTTPException(status_code=500, detail="Error fetching orders")

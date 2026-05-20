@@ -6,8 +6,6 @@ from app.auth.dependencies import get_current_user
 from app.schemas.cart import (
     CartItemCreate,
     CartItemUpdate,
-    CartOut,
-    CartItemOut,
     CartTotalOut,
     CartAddItemRequest,
     CartItemPublic,
@@ -31,32 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
 
-def _serialize(cart) -> CartOut:
-    total_items = len(cart.items)
-    total_quantity = sum(ci.quantity for ci in cart.items)
-    # Attempt to enrich with slipper data (if loaded later we can optimize)
-    items_out = []
-    total_amount = 0.0
-    for ci in cart.items:
-        name = None
-        price = None
-        total_price = None
-        if getattr(ci, 'slipper', None):
-            name = ci.slipper.name
-            price = ci.slipper.price
-            total_price = price * ci.quantity
-            total_amount += total_price
-        items_out.append(CartItemOut(
-            id=ci.id,
-            slipper_id=ci.slipper_id,
-            quantity=ci.quantity,
-            name=name,
-            price=price,
-            total_price=total_price
-        ))
-    return CartOut(id=cart.id, items=items_out, total_items=total_items, total_quantity=total_quantity, total_amount=total_amount)
-
-
 def _serialize_public(cart) -> CartPublicResponse:
     """Serialize cart into the public structure required by the spec.
 
@@ -66,10 +38,20 @@ def _serialize_public(cart) -> CartPublicResponse:
     items: list[CartItemPublic] = []
     total_amount_uzs: float = 0.0
 
+    unavailable_items: list[dict] = []
+
     for ci in cart.items:
         slipper = getattr(ci, "slipper", None)
-        if not slipper:
-            # If product is not loaded, skip to avoid incomplete data
+        if slipper is None:
+            # Product was deleted — surface it to the user rather than silently
+            # dropping it, so they know why their cart total may be wrong.
+            unavailable_items.append({
+                "product_id": ci.slipper_id,
+                "name": "Product no longer available",
+                "price": 0,
+                "quantity": ci.quantity,
+                "unavailable": True,
+            })
             continue
 
         price = slipper.price
@@ -94,6 +76,7 @@ def _serialize_public(cart) -> CartPublicResponse:
         total_amount=total_amount_uzs,
         currency="UZS",
         items_count=len(items),
+        unavailable_items=unavailable_items,
     )
 
     return CartPublicResponse(status="success", data=data)

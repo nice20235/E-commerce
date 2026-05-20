@@ -16,7 +16,6 @@ build/
 .env.production.local
 .env.*
 !.env.example
-!.env.production
 
 # Vite cache
 .vite/

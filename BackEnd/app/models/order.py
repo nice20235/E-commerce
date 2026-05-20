@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index, Enum, text
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, func, ForeignKey, Index, Enum, text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
 from datetime import datetime
@@ -105,8 +105,8 @@ class OrderItem(Base):
         index=True
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    unit_price: Mapped[float] = mapped_column(Float, nullable=False)
-    total_price: Mapped[float] = mapped_column(Float, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Numeric(precision=12, scale=2), nullable=False)
+    total_price: Mapped[float] = mapped_column(Numeric(precision=12, scale=2), nullable=False)
     notes: Mapped[str] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getOrders } from '../api/orders'
+import { getOrders, initPayment } from '../api/orders'
 import { Link } from 'react-router-dom'
 import type { Order } from '../types'
 import { useLang } from '../store/lang'
@@ -29,11 +29,13 @@ function formatDate(raw: string): string {
 
 export default function Orders() {
   const { t, lang } = useLang()
-  const { data: orders, isLoading, isError } = useQuery({
+  const { data: ordersData, isLoading, isError } = useQuery({
     queryKey: ['orders'],
-    queryFn: getOrders,
+    queryFn: () => getOrders(),
     staleTime: 30_000,
   })
+  const orders = ordersData?.orders
+  const ordersTotal = ordersData?.total ?? 0
 
   if (isLoading) {
     return (
@@ -100,7 +102,7 @@ export default function Orders() {
       <div className="flex items-center justify-between mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl font-black" style={{ color: '#1a2f4e' }}>{t('myOrders')}</h1>
-          <p className="text-sm mt-0.5" style={{ color: '#888' }}>{orders.length} {t('ordersCount')}</p>
+          <p className="text-sm mt-0.5" style={{ color: '#888' }}>{ordersTotal} {t('ordersCount')}</p>
         </div>
       </div>
 
@@ -180,8 +182,9 @@ export default function Orders() {
                   </div>
 
                   {order.status === 'PENDING' && !isNaN(numericId) && (
-                    <a
-                      href={`/api/payment/init/${numericId}?amount=${order.total_amount}`}
+                    <button
+                      type="button"
+                      onClick={() => initPayment(numericId, order.total_amount)}
                       className="inline-flex items-center justify-center gap-1.5 text-xs text-white rounded-full font-bold transition-all w-full sm:w-auto flex-shrink-0"
                       style={{
                         background: 'linear-gradient(135deg, #ff4d1c, #ff6a3c)',
@@ -196,7 +199,7 @@ export default function Orders() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
                       {t('payNow')}
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

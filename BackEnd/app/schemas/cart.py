@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
 class CartItemCreate(BaseModel):
     """Internal schema used by cart CRUD layer.
@@ -21,7 +21,7 @@ class CartAddItemRequest(BaseModel):
     quantity: int = Field(..., ge=1, le=999)
 
 class CartItemUpdate(BaseModel):
-    quantity: int = Field(..., ge=0, le=999)  # quantity 0 => remove
+    quantity: int = Field(..., ge=1, le=999)
 
 class CartItemOut(BaseModel):
     id: int
@@ -70,6 +70,7 @@ class CartPublicData(BaseModel):
     total_amount: float
     currency: str = "UZS"
     items_count: int
+    unavailable_items: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class CartPublicResponse(BaseModel):

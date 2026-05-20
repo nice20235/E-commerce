@@ -1,8 +1,18 @@
 import client from './client'
 import type { Order } from '../types'
 
-export const getOrders = () =>
-  client.get<Order[]>('/orders/').then((r) => r.data)
+export interface PaginatedOrders {
+  orders: Order[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export const getOrders = (skip = 0, limit = 50, status?: string) => {
+  const params = new URLSearchParams({ skip: String(skip), limit: String(limit) })
+  if (status && status !== 'ALL') params.set('status', status)
+  return client.get<PaginatedOrders>(`/orders/?${params}`).then((r) => r.data)
+}
 
 export const getOrder = (id: number) =>
   client.get<Order>(`/orders/${id}`).then((r) => r.data)

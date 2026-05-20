@@ -17,15 +17,14 @@ from contextlib import asynccontextmanager
 import uvicorn
 import logging
 import time
-from datetime import datetime
+import asyncio
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from app.core.config import settings
 from app.core.middleware import (
     PerformanceMiddleware,
-    CompressionHeaderMiddleware,
     SecurityHeadersMiddleware,
-    BasicAuthRPCMiddleware,
 )
 from app.core.cache import cache
 from app.db.database import init_db, close_db, AsyncSessionLocal
@@ -49,36 +48,23 @@ logger = logging.getLogger(__name__)
 START_TIME = time.time()
 
 
-async def warm_up_cache() -> None:
-    """Verify DB connectivity on startup by running a lightweight query.
-
-    The stepups catalog endpoint no longer uses @cached, so pre-fetching
-    the first page would only warm the connection pool — not the cache.
-    The health-check probe in lifespan already covers DB connectivity, so
-    this function is kept as a no-op to preserve the call site.
-    """
-    pass
-
 # Application lifespan manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown with optimizations"""
     # Startup
-    logger.info("🚀 Starting StepUp Order System...")
-    
+    logger.info("Starting StepUp Order System...")
+
     try:
         # Initialize database
         await init_db()
-        logger.info("✅ Database initialized")
-        
+        logger.info("Database initialized")
+
         # Initialize cache
         await cache.clear()  # Start with clean cache
-        logger.info("✅ Cache initialized")
-        
-        # Warm up critical cache entries if needed
-        await warm_up_cache()
-        
-        logger.info("✅ Application started successfully!")
+        logger.info("Cache initialized")
+
+        logger.info("Application started successfully!")
         
     except Exception as e:
         logger.error(f"❌ Failed to start application: {e}")
@@ -87,21 +73,21 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down...")
-    
+    logger.info("Shutting down...")
+
     try:
         # Clean up cache
         await cache.clear()
-        logger.info("✅ Cache cleared")
-        
+        logger.info("Cache cleared")
+
         # Close database connections
         await close_db()
-        logger.info("✅ Database connections closed")
-        
-        logger.info("✅ Application shutdown complete!")
-        
+        logger.info("Database connections closed")
+
+        logger.info("Application shutdown complete!")
+
     except Exception as e:
-        logger.error(f"❌ Error during shutdown: {e}")
+        logger.error(f"Error during shutdown: {e}")
 
 # Create FastAPI application with optimizations
 # Docs endpoints are only exposed when DEBUG=True to avoid leaking the API
@@ -162,9 +148,7 @@ logger.debug("[CORS] allowed_origins=%s regex=%s", allowed, origin_regex)
 
 # Performance middleware
 app.add_middleware(PerformanceMiddleware)
-app.add_middleware(CompressionHeaderMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(BasicAuthRPCMiddleware)
 
 # GZip compression for responses > 1KB
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -176,6 +160,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # redis, or a custom middleware using aioredis).
 from collections import defaultdict, deque
 _req_log = defaultdict(deque)
+_rate_limit_locks: dict = {}
 _exclude = {p.strip() for p in settings.RATE_LIMIT_EXCLUDE_PATHS.split(',') if p.strip()}
 
 @app.middleware("http")
@@ -188,36 +173,44 @@ async def rate_limit_middleware(request: Request, call_next):
     if any(path == p or path.startswith(p + "/") for p in _exclude):
         return await call_next(request)
 
-    # Identify client IP
+    # Identify client IP.
+    # Use rightmost entry from X-Forwarded-For: the trusted proxy appends the
+    # real client IP at the rightmost position, so it cannot be spoofed by the
+    # client (who can prepend arbitrary values to the leftmost position).
     if settings.TRUST_PROXY:
         fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(',')[0].strip() if fwd else (request.client.host if request.client else "unknown")
+        client_ip = fwd.split(',')[-1].strip() if fwd else (request.client.host if request.client else "unknown")
     else:
         client_ip = request.client.host if request.client else "unknown"
 
     now = time.time()
     window = settings.RATE_LIMIT_WINDOW_SEC
     limit = settings.RATE_LIMIT_REQUESTS
-    dq = _req_log[client_ip]
-    while dq and now - dq[0] > window:
-        dq.popleft()
-    if len(dq) >= limit:
-        reset_in = int(max(0, window - (now - dq[0]))) if dq else window
-        return JSONResponse(
-            status_code=429,
-            content={"detail": "Too many requests"},
-            headers={
-                "X-RateLimit-Limit": str(limit),
-                "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(reset_in)
-            }
-        )
-    dq.append(now)
-    # Periodically evict stale entries to prevent unbounded memory growth.
-    if len(_req_log) > 10_000:
-        stale = [ip for ip, q in list(_req_log.items()) if not q or now - q[-1] > window]
-        for ip in stale:
-            _req_log.pop(ip, None)
+
+    # Per-IP asyncio.Lock prevents a TOCTOU race where two concurrent requests
+    # for the same IP both pass the length check before either appends.
+    lock = _rate_limit_locks.setdefault(client_ip, asyncio.Lock())
+    async with lock:
+        dq = _req_log[client_ip]
+        while dq and now - dq[0] > window:
+            dq.popleft()
+        if len(dq) >= limit:
+            reset_in = int(max(0, window - (now - dq[0]))) if dq else window
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests"},
+                headers={
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(reset_in)
+                }
+            )
+        dq.append(now)
+        # Periodically evict stale entries to prevent unbounded memory growth.
+        if len(_req_log) > 10_000:
+            stale = [ip for ip, q in list(_req_log.items()) if not q or now - q[-1] > window]
+            for ip in stale:
+                _req_log.pop(ip, None)
     remaining = max(0, limit - len(dq))
     response = await call_next(request)
     response.headers["X-RateLimit-Limit"] = str(limit)
@@ -311,7 +304,7 @@ async def health_check() -> HealthCheckResponse:
     overall = "healthy" if (db_ok and cache_ok) else "degraded"
     return HealthCheckResponse(
         status=overall,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         version="2.0.0",
         database=db_ok,
         cache=cache_ok,
