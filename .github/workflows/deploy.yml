@@ -17,11 +17,13 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd /var/www/backend/StepUp
-            git pull
+            git pull origin main
             cd BackEnd
             source venv/bin/activate
             pip install -r requirements.txt --quiet
             systemctl restart stepup-backend
+            sleep 3
+            systemctl is-active stepup-backend
 
   deploy-frontend:
     name: Build & Deploy Frontend
@@ -42,7 +44,7 @@ jobs:
       - name: Build
         working-directory: FrontEnd
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://api.stepupp.uz' }}
         run: npm run build
 
       - name: Upload dist to VPS
@@ -52,5 +54,5 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "FrontEnd/dist/."
-          target: ${{ secrets.VPS_FRONTEND_PATH }}
+          target: "/var/www/stepupp/"
           overwrite: true
