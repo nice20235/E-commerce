@@ -138,7 +138,7 @@ export default function Orders() {
 
                 {/* Items list */}
                 <div className="space-y-2 mb-3 sm:mb-4">
-                  {order.items.slice(0, 3).map((item, idx) => (
+                  {(order.items ?? []).slice(0, 3).map((item, idx) => (
                     <div key={`${item.slipper_id}-${idx}`} className="flex items-center justify-between text-xs gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         {item.image ? (
@@ -161,13 +161,13 @@ export default function Orders() {
                         </span>
                       </div>
                       <span className="font-semibold flex-shrink-0" style={{ color: '#1a2f4e' }}>
-                        {item.total_price.toLocaleString()}
+                        {Number(item.total_price).toLocaleString()}
                       </span>
                     </div>
                   ))}
-                  {order.items.length > 3 && (
+                  {(order.items?.length ?? 0) > 3 && (
                     <p className="text-xs pl-9" style={{ color: '#bbb' }}>
-                      +{order.items.length - 3} {t('moreItems')}
+                      +{(order.items?.length ?? 0) - 3} {t('moreItems')}
                     </p>
                   )}
                 </div>
