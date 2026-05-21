@@ -175,10 +175,11 @@ export default function AllOrders() {
       {!!pageOrders?.length && (
         <div className="space-y-3">
           {pageOrders.map((order) => {
-            const numericId = parseInt(order.order_id.replace('order_', ''), 10)
             const isExpanded = expandedId === order.order_id
             const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING
             const statusLabel = s.label[lang] ?? order.status
+            const totalAmount = Number(order.total_amount) || 0
+            const itemCount = order.items?.length ?? 0
 
             return (
               <div
@@ -218,11 +219,11 @@ export default function AllOrders() {
                   {/* Right: amount */}
                   <div className="text-right flex-shrink-0">
                     <p className="font-black text-sm" style={{ color: '#1a2f4e' }}>
-                      {(order.total_amount / 100).toLocaleString()}
+                      {(totalAmount / 100).toLocaleString()}
                       <span className="text-[10px] ml-0.5 font-normal" style={{ color: '#ccc' }}>UZS</span>
                     </p>
                     <p className="text-xs" style={{ color: '#bbb' }}>
-                      {order.items.length} {order.items.length !== 1 ? 'items' : 'item'}
+                      {itemCount} {itemCount !== 1 ? 'items' : 'item'}
                     </p>
                   </div>
 
@@ -250,7 +251,7 @@ export default function AllOrders() {
                       {t('orderItems')}
                     </p>
                     <div className="space-y-2.5 mb-5">
-                      {order.items.map((item, idx) => (
+                      {(order.items ?? []).map((item, idx) => (
                         <div key={`${item.slipper_id}-${idx}`} className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
                             {item.image ? (
@@ -274,7 +275,7 @@ export default function AllOrders() {
                             <span className="text-xs flex-shrink-0" style={{ color: '#bbb' }}>× {item.quantity}</span>
                           </div>
                           <span className="text-sm font-semibold flex-shrink-0" style={{ color: '#1a2f4e' }}>
-                            {item.total_price.toLocaleString()}
+                            {(Number(item.total_price) || 0).toLocaleString()}
                           </span>
                         </div>
                       ))}

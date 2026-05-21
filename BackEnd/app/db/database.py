@@ -84,6 +84,26 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables and indexes created successfully!")
 
+        # Idempotent schema migrations for columns added after initial DB creation.
+        # create_all skips existing tables, so new columns must be added explicitly.
+        # Each statement uses IF NOT EXISTS / ADD COLUMN IF NOT EXISTS so they are
+        # safe to run on every startup, even when the column already exists.
+        migrations = [
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(64)",
+            "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()",
+            "CREATE INDEX IF NOT EXISTS idx_orders_updated ON orders(updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_orders_total_amount ON orders(total_amount)",
+            "CREATE INDEX IF NOT EXISTS idx_orders_user_status ON orders(user_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_orders_idempotency_key ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL",
+        ]
+        for stmt in migrations:
+            try:
+                await conn.execute(text(stmt))
+            except Exception as _migration_err:
+                logger.warning("Schema migration skipped: %s — %s", stmt[:60], _migration_err)
+
 # Close database connections
 async def close_db():
     """Close database connections"""

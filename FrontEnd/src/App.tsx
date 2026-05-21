@@ -21,26 +21,24 @@ import AllOrders from './pages/admin/AllOrders'
 import AdminUsers from './pages/admin/Users'
 
 export default function App() {
-  const { initFromStorage, isAuthenticated, user, setAuth } = useAuthStore()
+  const { isAuthenticated, user, setAuth, setVerifying } = useAuthStore()
 
-  useEffect(() => {
-    initFromStorage()
-  }, [initFromStorage])
-
-  // After restoring session from storage, fetch /users/me to get the real
-  // is_admin value (not persisted in localStorage for security reasons).
+  // Fetch /users/me on every load to confirm the real is_admin value.
+  // is_admin is not stored in localStorage, so it must be re-verified here.
   // Always re-fetch so demoted admins lose access immediately on session restore.
   useEffect(() => {
     if (isAuthenticated && user) {
       getMe().then((profile) => {
         setAuth({ ...user, ...profile })
       }).catch(() => {
-        // Silently ignore — user stays logged in with display-only data.
+        // getMe failed (e.g. server error). Unblock admin gate so the user
+        // is not stuck on a spinner; they may be redirected to "/" if not admin.
+        setVerifying(false)
       })
     }
   // user?.name ensures we only re-run when the logged-in identity changes,
   // not on every shallow object update, avoiding an infinite loop.
-  }, [isAuthenticated, user?.name, setAuth])
+  }, [isAuthenticated, user?.name, setAuth, setVerifying])
 
   return (
     <Layout>

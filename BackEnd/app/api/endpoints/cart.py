@@ -54,7 +54,9 @@ def _serialize_public(cart) -> CartPublicResponse:
             })
             continue
 
-        price = slipper.price
+        # slipper.price is Decimal (Numeric column); cast to float so arithmetic
+        # with the float accumulator does not raise TypeError.
+        price = float(slipper.price or 0)
         subtotal = price * ci.quantity
         total_amount_uzs += subtotal
 

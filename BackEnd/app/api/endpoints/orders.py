@@ -256,8 +256,8 @@ async def list_orders(
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error fetching orders: {e}")
+    except Exception:
+        logger.exception("Error fetching orders")
         raise HTTPException(status_code=500, detail="Error fetching orders")
 
 @router.get("/{order_id}")
@@ -314,7 +314,7 @@ async def get_order_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching order {order_id}: {e}")
+        logger.exception("Error fetching order %s", order_id)
         raise HTTPException(status_code=500, detail="Error fetching order")
 
 @router.put("/{order_id}")
