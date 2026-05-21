@@ -112,20 +112,18 @@ async def register_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    # Rate-limit registrations per IP
+    # Rate-limit registrations per IP — use X-Real-IP (set by nginx, not spoofable)
     if settings.TRUST_PROXY:
-        fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(",")[-1].strip() if fwd else (request.client.host if request.client else "unknown")
+        real_ip = request.headers.get("x-real-ip")
+        client_ip = real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
     else:
         client_ip = request.client.host if request.client else "unknown"
     _check_register_rate_limit(client_ip)
 
     existing_user_by_name = await get_user_by_name(db, user_data.name)
-    if existing_user_by_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this name already exists")
     existing_user_by_phone = await get_user_by_phone_number(db, user_data.phone_number)
-    if existing_user_by_phone:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this phone number already exists")
+    if existing_user_by_name or existing_user_by_phone:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Name or phone number already in use")
 
     try:
         user = await create_user(db, user_data)
@@ -153,8 +151,8 @@ async def login_user(
 ):
     from app.core.config import settings as _settings
     if _settings.TRUST_PROXY:
-        fwd = request.headers.get("x-forwarded-for")
-        client_ip = fwd.split(",")[-1].strip() if fwd else (request.client.host if request.client else "unknown")
+        real_ip = request.headers.get("x-real-ip")
+        client_ip = real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
     else:
         client_ip = request.client.host if request.client else "unknown"
     check_login_rate_limit(user_credentials.name, client_ip)

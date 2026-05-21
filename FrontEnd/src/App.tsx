@@ -30,9 +30,8 @@ export default function App() {
     if (isAuthenticated && user) {
       getMe().then((profile) => {
         setAuth({ ...user, ...profile })
-      }).catch(() => {
-        // getMe failed (e.g. server error). Unblock admin gate so the user
-        // is not stuck on a spinner; they may be redirected to "/" if not admin.
+      }).catch((err) => {
+        console.warn('[auth] getMe failed — admin role unverified:', err?.response?.status ?? err?.message)
         setVerifying(false)
       })
     }

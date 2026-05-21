@@ -1,5 +1,8 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import SecretStr
+
+_ENV_FILE = Path(__file__).parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -11,7 +14,7 @@ class Settings(BaseSettings):
     """
 
     # Pydantic v2 settings: read from .env and ignore extra keys to prevent crashes from unused env vars
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
     # Database connection string. Override in production via env DATABASE_URL.
     # Example: postgresql+asyncpg://user:strong_password@db-host:5432/stepup_db
