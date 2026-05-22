@@ -1,0 +1,23 @@
+[Unit]
+Description=StepUp FastAPI Backend
+After=network.target postgresql.service
+
+[Service]
+Type=exec
+User=root
+WorkingDirectory=/var/www/backend/StepUp/BackEnd
+Environment=PATH=/var/www/backend/StepUp/BackEnd/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+# Kill any straggler uvicorn processes from a prior unclean shutdown.
+# Pattern uses [u]vicorn instead of "uvicorn" so pkill does NOT match its
+# own parent shell process — that bug caused systemd to receive SIGTERM on
+# the ExecStartPre and treat startup as failed, looping forever (signal=TERM).
+ExecStartPre=/bin/sh -c 'pkill -f "[u]vicorn app.main" 2>/dev/null; sleep 2; exit 0'
+ExecStart=/var/www/backend/StepUp/BackEnd/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level warning
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=98
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
