@@ -30,16 +30,16 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 1  # Reduced from 7 to 1 day  
     SESSION_MAX_DAYS: int = 1  # Absolute maximum session lifetime (sliding disabled past this). 0 disables hard cap.
     SESSION_MAX_HOURS: int = 8  # Alternative to DAYS. If >0, hours takes precedence. Reduced from 12 to 8.
-    # Safe development-only defaults. In production, override ALLOWED_ORIGINS and
-    # ALLOWED_ORIGIN_REGEX via environment variables to list only your real domains.
+    # Defaults cover local dev. The canonical production hosts (stepupp.uz,
+    # www.stepupp.uz, api.stepupp.uz) are unconditionally added in main.py so
+    # they survive a misconfigured deployment .env.
     ALLOWED_ORIGINS: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
         "http://localhost:5173"
     )
-    # Production regex for subdomain matching. Set via env ALLOWED_ORIGIN_REGEX.
-    # Example: r"^https://(.+\.)?yourdomain\.com$"
-    # Defaults to None so that no wildcard regex is active unless explicitly configured.
+    # Optional env-supplied regex (e.g. for staging subdomains). Combined with
+    # the hardcoded production regex in main.py via alternation.
     ALLOWED_ORIGIN_REGEX: str | None = None
     LOGIN_RATE_LIMIT: int = 5  # попыток
     LOGIN_RATE_WINDOW_SEC: int = 300  # окно в секундах (5 минут)

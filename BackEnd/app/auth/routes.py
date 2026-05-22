@@ -18,6 +18,13 @@ from app.core.config import settings
 from app.core.cache import cache, invalidate_cache_pattern
 
 
+def _effective_cookie_secure() -> bool:
+    # In production (DEBUG=False) we always require the Secure flag, even if the
+    # deployment .env left COOKIE_SECURE=False — auth cookies must never travel
+    # over plaintext HTTP in production.
+    return bool(settings.COOKIE_SECURE) or (not settings.DEBUG)
+
+
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
     """Set HttpOnly cookies for access and refresh tokens.
 
@@ -25,11 +32,12 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     them in HttpOnly cookies that JavaScript cannot read, eliminating
     the most common XSS-based token theft vector.
     """
+    secure = _effective_cookie_secure()
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=secure,
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
@@ -39,7 +47,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=secure,
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
@@ -48,11 +56,12 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 
 def _clear_auth_cookies(response: Response) -> None:
+    secure = _effective_cookie_secure()
     for name in ("access_token", "refresh_token"):
         response.delete_cookie(
             key=name,
             path="/",
-            secure=settings.COOKIE_SECURE,
+            secure=secure,
             httponly=True,
             samesite=settings.COOKIE_SAMESITE,
             domain=settings.COOKIE_DOMAIN or None,

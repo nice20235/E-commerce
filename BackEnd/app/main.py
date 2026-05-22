@@ -111,12 +111,20 @@ app = FastAPI(
     openapi_url=_openapi_url,
 )
 """CORS middleware configuration
-We support both a concrete allow_origins list and a regex (allow_origin_regex) to
-cover www/non-www and subdomain variants. Trailing slashes are stripped since
-the browser's Origin header never contains them. If ALLOWED_ORIGIN_REGEX is set,
-it takes precedence over the explicit list.
+
+Origins come from two sources, combined defensively:
+  1) The env-driven ALLOWED_ORIGINS list (+ optional ALLOWED_ORIGIN_REGEX).
+  2) A hardcoded production safety net for the canonical stepupp.uz domain.
+
+The safety net guarantees login works on production even if the deployed `.env`
+contains a typo or is missing — which was the cause of a real outage. Removing
+items from the safety net requires explicit env opt-out via DISABLE_PROD_CORS_NET=1.
 """
-# Normalize origins
+# Canonical production hosts — always allowed unless explicitly disabled.
+_PROD_ORIGINS = ("https://stepupp.uz", "https://www.stepupp.uz", "https://api.stepupp.uz")
+_PROD_ORIGIN_REGEX = r"^https://([a-z0-9-]+\.)?stepupp\.uz$"
+
+# Normalize origins from env
 allowed: list[str] = []
 for o in settings.ALLOWED_ORIGINS.split(','):
     o = (o or "").strip()
@@ -126,6 +134,14 @@ for o in settings.ALLOWED_ORIGINS.split(','):
         o = o[:-1]
     allowed.append(o)
 
+# Merge in production safety net (idempotent, dedupes case-insensitively).
+if os.environ.get("DISABLE_PROD_CORS_NET") != "1":
+    _seen = {a.lower() for a in allowed}
+    for p in _PROD_ORIGINS:
+        if p.lower() not in _seen:
+            allowed.append(p)
+            _seen.add(p.lower())
+
 cors_kwargs = dict(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -133,18 +149,24 @@ cors_kwargs = dict(
     expose_headers=["X-Process-Time", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 
-# Allow both explicit origins and regex simultaneously.
-# This ensures localhost works in development even when a production regex is configured.
 cors_kwargs["allow_origins"] = allowed
-origin_regex = getattr(settings, "ALLOWED_ORIGIN_REGEX", None)
-# In DEBUG with no explicit regex, allow localhost variants only — not a wildcard.
-# A true wildcard (r".*") would allow any origin and must never be set in production.
-if settings.DEBUG and not origin_regex:
-    origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+# Combine env-supplied regex with the production net via alternation.
+# Starlette's CORSMiddleware only accepts a single regex string.
+env_regex = getattr(settings, "ALLOWED_ORIGIN_REGEX", None)
+regex_parts: list[str] = []
+if env_regex:
+    regex_parts.append(f"(?:{env_regex})")
+if os.environ.get("DISABLE_PROD_CORS_NET") != "1":
+    regex_parts.append(f"(?:{_PROD_ORIGIN_REGEX})")
+if settings.DEBUG and not env_regex:
+    # In DEBUG, also allow localhost variants. Never a wildcard.
+    regex_parts.append(r"(?:^https?://(localhost|127\.0\.0\.1)(:\d+)?$)")
+origin_regex = "|".join(regex_parts) if regex_parts else None
 if origin_regex:
     cors_kwargs["allow_origin_regex"] = origin_regex
 
-logger.debug("[CORS] allowed_origins=%s regex=%s", allowed, origin_regex)
+logger.info("[CORS] allowed_origins=%s regex=%s", allowed, origin_regex)
 
 # Performance middleware
 app.add_middleware(PerformanceMiddleware)
