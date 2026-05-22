@@ -142,9 +142,9 @@ async def promote_to_admin(db: AsyncSession, name: str) -> Optional[User]:
     )
     return result.scalar_one()
 
-async def update_user_password(db: AsyncSession, name: str, new_password: str, load_orders: bool = False) -> Optional[User]:
-    """Update user password by name"""
-    user = await get_user_by_name(db, name)
+async def update_user_password(db: AsyncSession, user_id: int, new_password: str, load_orders: bool = False) -> Optional[User]:
+    """Update user password by ID."""
+    user = await get_user(db, user_id)
     if not user:
         return None
     

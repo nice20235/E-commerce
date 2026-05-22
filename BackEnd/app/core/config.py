@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     # CALLBACK_BASIC_AUTH_USERNAME and CALLBACK_BASIC_AUTH_PASSWORD removed (payment system)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 1  # Reduced from 7 to 1 day  
-    SESSION_MAX_DAYS: int = 1  # Absolute maximum session lifetime (sliding disabled past this). 0 disables hard cap.
-    SESSION_MAX_HOURS: int = 8  # Alternative to DAYS. If >0, hours takes precedence. Reduced from 12 to 8.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 1
+    SESSION_MAX_DAYS: int = 1
+    SESSION_MAX_HOURS: int = 8
     # Defaults cover local dev. The canonical production hosts (stepupp.uz,
     # www.stepupp.uz, api.stepupp.uz) are unconditionally added in main.py so
     # they survive a misconfigured deployment .env.
@@ -61,12 +61,7 @@ class Settings(BaseSettings):
     # New payment redirect configuration (read from .env)
     PARTNER_ID: str | None = None
     PAYMENT_BASE_URL: str | None = None
-    # Legacy /rpc Basic Auth credentials (non-secret placeholders).
-    # Real values must be provided in env: ACQUIRING_RPC_BASIC_USERNAME / ACQUIRING_RPC_BASIC_PASSWORD
-    ACQUIRING_RPC_BASIC_USERNAME: str = "dev_rpc_user"
-    ACQUIRING_RPC_BASIC_PASSWORD: SecretStr = SecretStr("dev_rpc_password")
-
-    # JSON-RPC auth and external ekayring API (development placeholders)
+    # JSON-RPC auth and external ekayring API (development placeholders).
     # Real credentials for /api/rpc must be set via env RPC_USERNAME / RPC_PASSWORD.
     RPC_USERNAME: str = "dev_merchant_api_user"
     RPC_PASSWORD: SecretStr = SecretStr("dev_merchant_api_password")
@@ -74,18 +69,18 @@ class Settings(BaseSettings):
     # App runtime settings (production deploy alignment)
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
-    APP_WORKERS: int = 1  # only used if a process manager launches multiple workers
+    # Keep at 1 until a Redis-backed shared cache and rate limiter are in place.
+    # With multiple workers: login rate-limiting and logout cache-invalidation are
+    # per-process only, effectively halving their protection per extra worker.
+    APP_WORKERS: int = 1
 
     # Auth user cache TTL (seconds). Lower = staler data survives shorter after role/password changes.
     USER_CACHE_TTL_SEC: int = 10
     # Max image upload size per file in megabytes
     MAX_IMAGE_SIZE_MB: int = 5
 
-    # Order guards
-    # Upper bound per order line to prevent accidental huge quantities.
-    # Increased to 1000 so that wholesale-like orders from cart (e.g. 700 pcs)
-    # are allowed by default. Can be overridden via env if needed.
-    ORDER_MAX_QTY_PER_ITEM: int = 1000
+    # Max images per product (enforced in upload endpoint).
+    MAX_IMAGES_PER_PRODUCT: int = 20
 
 settings = Settings()
 

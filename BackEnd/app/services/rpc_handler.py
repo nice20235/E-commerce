@@ -273,7 +273,10 @@ class RpcHandler:
         if not isinstance(from_time, int) or not isinstance(to_time, int):
             return None, {"code": ERROR_INVALID_REQUEST, "message": "Invalid period"}
 
-        txs = await transaction_crud.get_statement(self.db, from_time=from_time, to_time=to_time)
+        try:
+            txs = await transaction_crud.get_statement(self.db, from_time=from_time, to_time=to_time)
+        except ValueError as exc:
+            return None, {"code": ERROR_INVALID_REQUEST, "message": str(exc)}
 
         items: list[Dict[str, Any]] = []
         for tx in txs:

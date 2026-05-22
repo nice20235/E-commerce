@@ -251,11 +251,23 @@ async def upload_slipper_images(
 ):
     """Upload one or many images for a stepup. First image becomes main image if not set."""
     if len(images) > 10:
-        raise HTTPException(status_code=400, detail="Too many images. Maximum 10 images allowed.")
+        raise HTTPException(status_code=400, detail="Too many images. Maximum 10 images per request.")
 
     slipper = await get_slipper(db, slipper_id=slipper_id)
     if not slipper:
         raise HTTPException(status_code=404, detail="StepUp not found")
+
+    # Enforce per-product total cap to prevent unbounded image rows
+    from sqlalchemy import func as _func
+    existing_count_result = await db.execute(
+        select(_func.count()).where(StepUpImage.slipper_id == slipper_id)
+    )
+    existing_count = existing_count_result.scalar() or 0
+    if existing_count + len(images) > settings.MAX_IMAGES_PER_PRODUCT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Product already has {existing_count} image(s). Max {settings.MAX_IMAGES_PER_PRODUCT} total.",
+        )
 
     uploaded_images: List[dict] = []
     first_image_path: Optional[str] = None

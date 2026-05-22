@@ -12,7 +12,10 @@ Environment=PATH=/var/www/backend/StepUp/BackEnd/venv/bin:/usr/local/sbin:/usr/l
 # own parent shell process — that bug caused systemd to receive SIGTERM on
 # the ExecStartPre and treat startup as failed, looping forever (signal=TERM).
 ExecStartPre=/bin/sh -c 'pkill -f "[u]vicorn app.main" 2>/dev/null; sleep 2; exit 0'
-ExecStart=/var/www/backend/StepUp/BackEnd/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level warning
+# Single worker until a Redis-backed shared cache/rate-limiter is added.
+# With >1 workers: login rate-limiting and logout cache-invalidation are
+# per-process only, halving their effectiveness per extra worker.
+ExecStart=/var/www/backend/StepUp/BackEnd/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level warning
 Restart=on-failure
 RestartSec=5
 RestartPreventExitStatus=98

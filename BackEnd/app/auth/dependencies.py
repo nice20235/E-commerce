@@ -88,7 +88,7 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
                 if jwt_token_version != user_ctx.token_version:
                     logger.warning(f"Token version mismatch (cached) for user {user_id}: jwt={jwt_token_version} cached={user_ctx.token_version}")
                     raise credentials_exception
-                logger.info(f"User authenticated from cache: id={user_id}")
+                logger.debug("User authenticated from cache: id=%s", user_id)
                 return user_ctx
             except HTTPException:
                 raise
@@ -118,7 +118,7 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
 
         await cache.set(cache_key, user_ctx, ttl=_settings.USER_CACHE_TTL_SEC)
 
-        logger.info(f"User authenticated successfully: {user_ctx.name} (ID: {user_ctx.id})")
+        logger.debug("User authenticated: id=%s", user_ctx.id)
         return user_ctx
         
     except (JWTError, ValueError) as e:

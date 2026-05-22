@@ -331,8 +331,10 @@ async def update_order_endpoint(order_id: int, order_update: OrderUpdate, db: As
         logger.warning(f"User {user.name} attempted to update order {order_id} belonging to user {db_order.user_id}")
         raise HTTPException(status_code=403, detail="You can only update your own orders")
 
-    # Regular users may only update notes; status and total_amount are admin-only
+    # Regular users may only update notes on PENDING orders
     if not user.is_admin:
+        if db_order.status != OrderStatus.PENDING:
+            raise HTTPException(status_code=403, detail="Only admins can modify non-pending orders")
         if order_update.status is not None:
             raise HTTPException(status_code=403, detail="Only admins can change order status")
         if order_update.total_amount is not None:
@@ -390,13 +392,14 @@ async def delete_order_endpoint(order_id: int, db: AsyncSession = Depends(get_db
     
     # Check permissions
     if not user.is_admin and db_order.user_id != user.id:
-        logger.warning(f"User {user.name} (Admin: {user.is_admin}) attempted to delete order {order_id} belonging to user {db_order.user_id}")
-        raise HTTPException(
-            status_code=403, 
-            detail="You can only delete your own orders"
-        )
-    
-    logger.info(f"Deleting order {order_id} by user: {user.name} (Admin: {user.is_admin})")
+        logger.warning(f"User {user.name} attempted to delete order {order_id} belonging to user {db_order.user_id}")
+        raise HTTPException(status_code=403, detail="You can only delete your own orders")
+
+    # Users can only delete PENDING orders — paid/refunded orders are financial records
+    if not user.is_admin and db_order.status != OrderStatus.PENDING:
+        raise HTTPException(status_code=403, detail="Only pending orders can be deleted")
+
+    logger.info(f"Deleting order {order_id} by user {user.id} (admin={user.is_admin})")
     await delete_order(db, db_order)
     
     # Clear cache after deleting order

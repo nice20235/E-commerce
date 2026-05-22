@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, Component, type ReactNode } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import { getMe } from './api/users'
@@ -20,6 +20,29 @@ import AdminProducts from './pages/admin/Products'
 import AllOrders from './pages/admin/AllOrders'
 import AdminUsers from './pages/admin/Users'
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {
+  state = { crashed: false }
+  static getDerivedStateFromError() { return { crashed: true } }
+  componentDidCatch(err: Error) { console.error('[ErrorBoundary]', err) }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, fontFamily: 'sans-serif' }}>
+          <p style={{ fontSize: 18, fontWeight: 700, color: '#1a2f4e' }}>Что-то пошло не так</p>
+          <p style={{ fontSize: 14, color: '#888' }}>Пожалуйста, обновите страницу</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '10px 24px', borderRadius: 12, background: '#1a2f4e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+          >
+            Обновить
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   const { isAuthenticated, user, setAuth, setVerifying } = useAuthStore()
 
@@ -40,6 +63,7 @@ export default function App() {
   }, [isAuthenticated, user?.name, setAuth, setVerifying])
 
   return (
+    <ErrorBoundary>
     <Layout>
       <Routes>
         {/* Public */}
@@ -68,5 +92,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </ErrorBoundary>
   )
 }

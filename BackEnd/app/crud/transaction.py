@@ -64,12 +64,18 @@ async def update_transaction_state(
     return tx
 
 
+_STATEMENT_MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000  # 31 days in milliseconds
+_STATEMENT_MAX_ROWS = 10_000
+
+
 async def get_statement(
     db: AsyncSession,
     *,
     from_time: int,
     to_time: int,
 ) -> Sequence[Transaction]:
+    if to_time - from_time > _STATEMENT_MAX_RANGE_MS:
+        raise ValueError(f"Statement range exceeds 31-day maximum")
     stmt = (
         select(Transaction)
         .where(
@@ -79,6 +85,7 @@ async def get_statement(
             )
         )
         .order_by(Transaction.create_time)
+        .limit(_STATEMENT_MAX_ROWS)
     )
     res = await db.execute(stmt)
     return res.scalars().all()
