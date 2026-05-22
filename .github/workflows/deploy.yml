@@ -57,6 +57,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: "FrontEnd/dist/."
+          # strip_components: 2 drops "FrontEnd/dist/" so files land directly
+          # under target (e.g. index.html, assets/*) instead of being nested
+          # under /var/www/stepupp/FrontEnd/dist/.
+          source: "FrontEnd/dist/*"
           target: "/var/www/stepupp/"
+          strip_components: 2
           overwrite: true
