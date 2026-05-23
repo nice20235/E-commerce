@@ -46,12 +46,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
 
-        # Add security headers (safe defaults)
+        # Prevent MIME-type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
+        # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # Control referrer information leakage
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Disable browser features not used by this API
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=()"
+        )
+
+        # HSTS: only meaningful on HTTPS connections; sending it over HTTP is a
+        # no-op for browsers but causes confusion. nginx should also set this for
+        # the HTTPS vhost, but we add it here as defence-in-depth when behind TLS.
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
 
         # Do NOT set CSP on interactive docs/static assets to avoid blocking Swagger UI
         path = request.url.path
