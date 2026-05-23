@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
-import uvicorn
 import logging
 import time
 import asyncio
@@ -248,9 +247,7 @@ app.add_middleware(CORSMiddleware, **cors_kwargs)
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    """Global exception handler for better error responses"""
-    from fastapi import HTTPException as _HTTPException
-    if isinstance(exc, _HTTPException):
+    if isinstance(exc, HTTPException):
         raise exc
     logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
@@ -333,10 +330,11 @@ async def health_check() -> HealthCheckResponse:
     )
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(
         "app.main:app",
         host=settings.APP_HOST,
         port=settings.APP_PORT,
-        reload=settings.DEBUG,  # reload=True only in DEBUG mode; always False in production
+        reload=settings.DEBUG,
         log_level="debug" if settings.DEBUG else "warning",
     )

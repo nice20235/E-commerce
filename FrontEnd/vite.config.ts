@@ -12,6 +12,20 @@ const spaBypass = (req: { headers: Record<string, string | string[] | undefined>
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-axios': ['axios'],
+          'vendor-zustand': ['zustand'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {

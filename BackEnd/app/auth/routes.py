@@ -72,6 +72,14 @@ logger = logging.getLogger(__name__)
 
 auth_router = APIRouter()
 
+
+def _client_ip(request: Request) -> str:
+    """Extract the real client IP, honoring the proxy trust setting."""
+    if settings.TRUST_PROXY:
+        real_ip = request.headers.get("x-real-ip")
+        return real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
+    return request.client.host if request.client else "unknown"
+
 # In-memory rate limit storage: key -> deque[timestamps].
 # NOTE: This state is per-process and resets on restart. It is NOT shared
 # across multiple workers. For multi-worker deployments, replace with a
@@ -121,13 +129,7 @@ async def register_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    # Rate-limit registrations per IP — use X-Real-IP (set by nginx, not spoofable)
-    if settings.TRUST_PROXY:
-        real_ip = request.headers.get("x-real-ip")
-        client_ip = real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
-    else:
-        client_ip = request.client.host if request.client else "unknown"
-    _check_register_rate_limit(client_ip)
+    _check_register_rate_limit(_client_ip(request))
 
     existing_user_by_name = await get_user_by_name(db, user_data.name)
     existing_user_by_phone = await get_user_by_phone_number(db, user_data.phone_number)
@@ -158,13 +160,7 @@ async def login_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    from app.core.config import settings as _settings
-    if _settings.TRUST_PROXY:
-        real_ip = request.headers.get("x-real-ip")
-        client_ip = real_ip.strip() if real_ip else (request.client.host if request.client else "unknown")
-    else:
-        client_ip = request.client.host if request.client else "unknown"
-    check_login_rate_limit(user_credentials.name, client_ip)
+    check_login_rate_limit(user_credentials.name, _client_ip(request))
     user = await get_user_by_name(db, user_credentials.name)
     if not user or not verify_password(user_credentials.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
