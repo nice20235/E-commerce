@@ -290,24 +290,28 @@ export default function AllOrders() {
       )}
 
       {/* Pagination controls */}
-      {(serverTotal) > ITEMS_PER_PAGE && (
-        <div className="flex items-center gap-4 mt-4">
+      {serverTotal > ITEMS_PER_PAGE && (
+        <div className="flex items-center justify-center gap-3 mt-5">
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+            className="rounded-xl font-medium transition-all disabled:opacity-40"
+            style={{ border: '1.5px solid #e8e5e0', color: '#888', background: '#fff', padding: '10px 18px', fontSize: 14, minHeight: 44 }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = '#1a2f4e'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#1a2f4e' } }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#e8e5e0' }}
           >
             {lang === 'uz' ? 'Oldingi' : 'Назад'}
           </button>
-          <span className="text-sm" style={{ color: '#888' }}>
-            {lang === 'uz'
-              ? `Sahifa ${page + 1} / ${Math.ceil(serverTotal / ITEMS_PER_PAGE)}`
-              : `Страница ${page + 1} из ${Math.ceil(serverTotal / ITEMS_PER_PAGE)}`}
+          <span className="rounded-xl font-medium flex items-center justify-center" style={{ background: '#f7f5f2', color: '#888', padding: '10px 18px', fontSize: 14 }}>
+            {page + 1} / {Math.ceil(serverTotal / ITEMS_PER_PAGE)}
           </span>
           <button
             onClick={() => setPage(p => p + 1)}
-            disabled={(page + 1) * ITEMS_PER_PAGE >= (serverTotal)}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+            disabled={(page + 1) * ITEMS_PER_PAGE >= serverTotal}
+            className="rounded-xl font-medium transition-all disabled:opacity-40"
+            style={{ border: '1.5px solid #e8e5e0', color: '#888', background: '#fff', padding: '10px 18px', fontSize: 14, minHeight: 44 }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = '#1a2f4e'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#1a2f4e' } }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#e8e5e0' }}
           >
             {lang === 'uz' ? 'Keyingi' : 'Вперёд'}
           </button>

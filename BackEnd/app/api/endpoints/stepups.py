@@ -336,10 +336,12 @@ async def upload_slipper_images(
         await asyncio.to_thread(_write_bytes, file_path, data)
         relative_path = f"/static/images/{filename}"
 
+        is_first = existing_count == 0 and i == 0
         slipper_image = StepUpImage(
             slipper_id=slipper_id,
             image_path=relative_path,
-            order_index=i,
+            is_primary=is_first,
+            order_index=existing_count + i,
         )
         db.add(slipper_image)
 
@@ -349,7 +351,7 @@ async def upload_slipper_images(
         uploaded_images.append(
             {
                 "image_path": relative_path,
-                "order_index": i,
+                "order_index": existing_count + i,
             }
         )
 
