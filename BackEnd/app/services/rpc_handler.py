@@ -28,6 +28,31 @@ def now_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _extract_order_db_id(account: Dict[str, Any]) -> Optional[int]:
+    """Resolve a numeric order DB id from acquirer ``account`` data.
+
+    Accepts the public id form ("order_1"), a raw int, or a numeric string.
+    Returns None for anything else (phone-only or "cart_*" references), which
+    callers treat as "no concrete order to validate against yet".
+    """
+    order = (account or {}).get("order") or (account or {}).get("order_id")
+    if not order:
+        return None
+    if isinstance(order, str) and order.startswith("order_"):
+        _, _, maybe_id = order.partition("_")
+        try:
+            return int(maybe_id)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(order, bool):  # bool is a subclass of int; never an order id
+        return None
+    if isinstance(order, int):
+        return order
+    if isinstance(order, str) and order.isdigit():
+        return int(order)
+    return None
+
+
 class RpcHandler:
     """Handler for JSON-RPC methods.
 
@@ -148,6 +173,24 @@ class RpcHandler:
                 "transaction": existing.transaction,
                 "state": existing.state,
             }, None
+
+        # Re-validate against the referenced order before creating a NEW
+        # transaction. CheckPerformTransaction performs this check too, but a
+        # robust merchant must not rely on the acquirer calling it first: bind
+        # the amount and order state here so a transaction can never be created
+        # for a wrong amount, a missing order, or an already-paid order.
+        order_db_id = _extract_order_db_id(account)
+        if order_db_id is not None:
+            res = await self.db.execute(select(Order).where(Order.id == order_db_id))
+            db_order = res.scalar_one_or_none()
+            if db_order is None:
+                return None, {"code": ERROR_INVALID_ACCOUNT, "message": "Order not found"}
+            status_raw = getattr(db_order, "status", None)
+            status_name = status_raw.value if isinstance(status_raw, OrderStatus) else str(status_raw or "")
+            if status_name.upper() != "PENDING":
+                return None, {"code": ERROR_INVALID_ACCOUNT, "message": "Order is not payable"}
+            if amount != int(db_order.total_amount or 0):
+                return None, {"code": ERROR_INVALID_REQUEST, "message": "Invalid amount"}
 
         create_time = now_ms()
         merchant_tx_id = acquirer_id  # simple mapping 1:1
@@ -348,6 +391,20 @@ class RpcHandler:
             if order_db_id is None:
                 self._logger.warning("No order id resolved from transaction account data: %s (tx=%s)", account, getattr(tx, 'id', None))
                 return
+
+        # Defense in depth: never mark an order PAID for an amount that does not
+        # match the transaction (the perform path must not blindly trust state).
+        res = await self.db.execute(select(Order).where(Order.id == order_db_id))
+        db_order = res.scalar_one_or_none()
+        if db_order is None:
+            self._logger.warning("Order %s not found when marking paid (tx=%s)", order_db_id, getattr(tx, 'id', None))
+            return
+        if int(getattr(tx, "amount", 0) or 0) != int(db_order.total_amount or 0):
+            self._logger.error(
+                "Refusing to mark order %s PAID: tx amount %s != order total %s (tx=%s)",
+                order_db_id, getattr(tx, "amount", None), db_order.total_amount, getattr(tx, 'id', None),
+            )
+            return
 
         # Update order status to PAID
         from app.crud.cart import clear_cart  # local import to avoid cycles

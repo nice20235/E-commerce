@@ -10,7 +10,7 @@ const content = {
       {
         title: '1. Buyurtma va to\'lov usullari',
         items: [
-          'Buyurtmalar sayt orqali qabul qilinadi: https://www.sstepup.uz/',
+          'Buyurtmalar sayt orqali qabul qilinadi: https://www.stepupp.uz/',
           'To\'lov imkoniyatlari: bank kartasi (UZCARD, HUMO, Visa, MasterCard, UnionPay) orqali himoyalangan to\'lov xizmati; saytda ko\'rsatilgan boshqa to\'lov usullari.',
           'Barcha hisob-kitoblar O\'zbekiston Respublikasi so\'mida amalga oshiriladi.',
         ],
@@ -62,7 +62,7 @@ const content = {
       {
         title: '1. Способы заказа и оплаты',
         items: [
-          'Заказы принимаются через сайт: https://www.sstepup.uz/',
+          'Заказы принимаются через сайт: https://www.stepupp.uz/',
           'Оплата возможна: банковской картой (UZCARD, HUMO, Visa, MasterCard, UnionPay) через защищённый платёжный сервис; иными методами оплаты, указанными на сайте.',
           'Все расчёты производятся в сумах Республики Узбекистан.',
         ],

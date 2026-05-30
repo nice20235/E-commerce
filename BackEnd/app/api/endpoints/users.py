@@ -193,14 +193,19 @@ async def update_own_profile(
     Update the profile of the currently authenticated user.
     Users cannot change their own admin status (is_admin).
     """
-    # Handle optional password change (load from DB to get hash — never store hash in CurrentUser)
+    # Reload the persisted user from the current DB session up front, because
+    # `current_user` is a detached value object, not an ORM instance.
+    db_user = await get_user(db, current_user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # --- Validate EVERYTHING before mutating anything --------------------
+    # Previously the password was changed and committed before the rest of the
+    # request was validated, so a later failure (e.g. a duplicate phone number)
+    # left the password already changed. Validate first, then apply.
     if user_update.new_password is not None:
-        fresh_user = await get_user(db, current_user.id)
-        if not fresh_user or not verify_password(user_update.current_password or "", fresh_user.password_hash):
+        if not verify_password(user_update.current_password or "", db_user.password_hash):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
-        updated_pw = await update_user_password(db, fresh_user.id, user_update.new_password)
-        if not updated_pw:
-            raise HTTPException(status_code=500, detail="Failed to update password")
 
     # Sanitize payload to exclude is_admin and password fields
     payload = user_update.model_dump(exclude_unset=True)
@@ -223,12 +228,7 @@ async def update_own_profile(
             if existing and existing.id != current_user.id:
                 raise HTTPException(status_code=400, detail="Phone number already in use")
 
-    # Reload the persisted user from the current DB session before updating,
-    # because `current_user` is a detached value object, not an ORM instance.
-    db_user = await get_user(db, current_user.id)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+    # --- All validation passed; apply mutations --------------------------
     try:
         updated_user = await update_user(db, db_user, sanitized_update)
     except IntegrityError as ie:
@@ -237,6 +237,12 @@ async def update_own_profile(
         if 'phone_number' in msg or 'UNIQUE' in msg.upper():
             raise HTTPException(status_code=400, detail="Phone number already in use")
         raise HTTPException(status_code=400, detail="Update failed")
+
+    # Apply the password change last, only after the profile update succeeded.
+    if user_update.new_password is not None:
+        updated_pw = await update_user_password(db, db_user.id, user_update.new_password)
+        if not updated_pw:
+            raise HTTPException(status_code=500, detail="Failed to update password")
 
     # Invalidate related caches
     await invalidate_cache_pattern("users:")

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.middleware.auth import verify_basic_auth
+from app.middleware.auth import verify_basic_auth, verify_rpc_ip
 from app.schemas.rpc import JsonRpcRequest, JsonRpcResponse, JsonRpcError, ErrorObject
 from app.services.rpc_handler import RpcHandler
 
@@ -16,6 +16,7 @@ router = APIRouter()
 @router.post("/rpc", response_model=JsonRpcResponse | JsonRpcError)
 async def rpc_endpoint(
     request: JsonRpcRequest,
+    __: None = Depends(verify_rpc_ip),
     _: None = Depends(verify_basic_auth),
     db: AsyncSession = Depends(get_db),
 ) -> JsonRpcResponse | JsonRpcError:

@@ -1,6 +1,6 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func, and_
 from app.models.order import Order, OrderItem, OrderStatus
@@ -27,6 +27,31 @@ def _compute_total_tiyin_from_items(items: list[OrderItem]) -> int:
         for it in (items or [])
     )
     return int(round(float(total_uzs) * 100))
+
+
+async def _restock_order_items(db: AsyncSession, order_id: int) -> None:
+    """Return reserved stock to inventory for every item of an order.
+
+    Called when a stock reservation is released: a still-PENDING order is
+    deleted, or an order transitions to REFUNDED. Increments are atomic
+    (``quantity = quantity + n``) so they are safe under concurrency, and the
+    callers guard against running this twice for the same release.
+    """
+    rows = (
+        await db.execute(
+            select(OrderItem.slipper_id, OrderItem.quantity).where(OrderItem.order_id == order_id)
+        )
+    ).all()
+    for slipper_id, qty in rows:
+        if not qty:
+            continue
+        await db.execute(
+            update(StepUp)
+            .where(StepUp.id == slipper_id)
+            .values(quantity=StepUp.quantity + int(qty))
+            .execution_options(synchronize_session=False)
+        )
+
 
 async def get_order(db: AsyncSession, order_id: int, load_relationships: bool = True) -> Optional[Order]:
     """Get order by ID with optional relationship loading"""
@@ -144,17 +169,29 @@ async def create_order(
         new_items_total: Decimal = Decimal("0")
         # For each incoming item, merge into existing or create new
         for item_data in order.items:
-            slipper = (await db.execute(select(StepUp).where(StepUp.id == item_data.slipper_id))).scalar_one_or_none()
-            if not slipper:
-                raise ValueError(f"StepUp with ID {item_data.slipper_id} not found")
-            # Enforce stock limit against existing quantity in merge target
             incoming_qty = int(item_data.quantity)
-            already = existing_by_slipper.get(item_data.slipper_id).quantity if item_data.slipper_id in existing_by_slipper else 0
-            if already + incoming_qty > (slipper.quantity or 0):
+            # Atomically reserve the incremental quantity against current stock.
+            # The previously-ordered units for this slipper are already reserved,
+            # so only the new units need deducting. RETURNING gives us the price
+            # in the same statement (removes the prior per-item N+1 SELECT).
+            reserve = await db.execute(
+                update(StepUp)
+                .where(StepUp.id == item_data.slipper_id, StepUp.quantity >= incoming_qty)
+                .values(quantity=StepUp.quantity - incoming_qty)
+                .returning(StepUp.price)
+                .execution_options(synchronize_session=False)
+            )
+            price_row = reserve.first()
+            if price_row is None:
+                exists = (
+                    await db.execute(select(StepUp.id).where(StepUp.id == item_data.slipper_id))
+                ).scalar_one_or_none()
+                if exists is None:
+                    raise ValueError(f"StepUp with ID {item_data.slipper_id} not found")
                 raise ValueError(
-                    f"Requested quantity exceeds available stock for item {item_data.slipper_id} (requested={already + incoming_qty}, available={slipper.quantity})"
+                    f"Requested quantity exceeds available stock for item {item_data.slipper_id} (requested={incoming_qty})"
                 )
-            unit_price = slipper.price
+            unit_price = price_row[0]
             if item_data.slipper_id in existing_by_slipper:
                 existing_item = existing_by_slipper[item_data.slipper_id]
                 existing_item.quantity += incoming_qty
@@ -216,12 +253,24 @@ async def create_order(
     if item_ids:
         rows = await db.execute(select(StepUp.id, StepUp.quantity, StepUp.price).where(StepUp.id.in_(item_ids)))
         step_by_id = {int(r[0]): (int(r[1] or 0), Decimal(str(r[2] or "0"))) for r in rows.all()}
-        # Verify all exist and stock is sufficient
-        for sid, qty in requested.items():
+        # Verify all requested products exist (clear error before touching stock).
+        for sid in requested:
             if sid not in step_by_id:
                 raise ValueError(f"StepUp with ID {sid} not found")
-            available, _ = step_by_id[sid]
-            if qty > available:
+        # Atomically reserve stock. The conditional UPDATE only succeeds while
+        # enough stock remains, so two concurrent checkouts can never both
+        # decrement past zero (closes the check-then-act / overselling race).
+        # These run inside the same transaction as the INSERTs below, so any
+        # later failure rolls the reservation back (get_db rolls back on error).
+        for sid, qty in requested.items():
+            reserve = await db.execute(
+                update(StepUp)
+                .where(StepUp.id == sid, StepUp.quantity >= qty)
+                .values(quantity=StepUp.quantity - qty)
+                .execution_options(synchronize_session=False)
+            )
+            if reserve.rowcount != 1:
+                available = step_by_id[sid][0]
                 raise ValueError(
                     f"Requested quantity exceeds available stock for item {sid} (requested={qty}, available={available})"
                 )
@@ -329,10 +378,15 @@ async def create_order(
 
 async def update_order(db: AsyncSession, db_order: Order, order_update: OrderUpdate) -> Order:
     """Update an existing order and return with relationships."""
+    previous_status = db_order.status
     update_data = order_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_order, field, value)
     db.add(db_order)
+    # Release reserved stock when an admin refunds an order (guarded so the
+    # restock fires only on the PENDING/PAID -> REFUNDED transition).
+    if previous_status != OrderStatus.REFUNDED and db_order.status == OrderStatus.REFUNDED:
+        await _restock_order_items(db, db_order.id)
     await db.commit()
     await db.refresh(db_order)
     result = await db.execute(
@@ -353,9 +407,14 @@ async def update_order_status(db: AsyncSession, order_id: int, status: OrderStat
     order = await get_order(db, order_id)
     if not order:
         return None
-    
+
+    previous_status = order.status
     order.status = status
     db.add(order)
+    # Release reserved stock when an order becomes REFUNDED. Guarded on the
+    # previous status so repeated REFUNDED writes never restock more than once.
+    if previous_status != OrderStatus.REFUNDED and status == OrderStatus.REFUNDED:
+        await _restock_order_items(db, order.id)
     await db.commit()
     await db.refresh(order)
     # Invalidate relevant caches so list/get endpoints see fresh data
@@ -382,6 +441,12 @@ async def update_order_status(db: AsyncSession, order_id: int, status: OrderStat
 
 async def delete_order(db: AsyncSession, db_order: Order) -> bool:
     """Delete order (cascade will delete items)"""
+    # A still-PENDING order holds a stock reservation that was never converted
+    # to a sale; deleting it must return that stock to inventory. PAID orders
+    # are left alone (stock stays sold) and REFUNDED orders already restocked
+    # at refund time, so only PENDING triggers a release here.
+    if db_order.status == OrderStatus.PENDING:
+        await _restock_order_items(db, db_order.id)
     await db.delete(db_order)
     await db.commit()
     return True

@@ -246,25 +246,47 @@ async def refresh_token(
 
 @auth_router.post("/logout")
 async def logout(request: Request, db: AsyncSession = Depends(get_db)):
-    """Logout: clear HttpOnly cookies, invalidate cache, and increment token_version."""
-    try:
-        token = request.cookies.get("access_token")
-        if token:
-            payload = decode_access_token(token)
-            if payload and "sub" in payload:
-                user_id = payload["sub"]
-                await cache.clear_pattern(f"user:{user_id}")
-                await invalidate_cache_pattern(f"orders:list:uid={user_id}")
-                logger.info(f"Logged out user {user_id}, cache cleared")
+    """Logout: revoke tokens (bump token_version), then clear cookies.
 
-                # Increment token_version to invalidate all previously issued tokens
-                user = await get_user(db, int(user_id))
-                if user:
-                    user.token_version += 1
-                    db.add(user)
-                    await db.commit()
-    except Exception as e:
-        logger.warning(f"Logout cleanup error: {e}")
+    Token revocation is the security-critical step and must actually persist. If
+    the DB commit fails we surface a 500 and leave the cookies in place rather
+    than reporting a false "logged out" while the session is still valid. Cache
+    cleanup is best-effort and its failures are non-fatal.
+    """
+    user_id: str | None = None
+    token = request.cookies.get("access_token")
+    if token:
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            user_id = payload["sub"]
+
+    if user_id is not None:
+        # 1) Revoke all previously issued tokens by bumping token_version.
+        #    A failure here means logout did NOT happen — report it.
+        try:
+            user = await get_user(db, int(user_id))
+        except (ValueError, TypeError):
+            user = None
+        if user is not None:
+            user.token_version += 1
+            db.add(user)
+            try:
+                await db.commit()
+            except Exception as exc:
+                await db.rollback()
+                logger.error("Logout failed to revoke tokens for user %s: %s", user_id, exc)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Logout failed, please try again.",
+                )
+
+        # 2) Best-effort cache cleanup (safe to ignore failures).
+        try:
+            await cache.clear_pattern(f"user:{user_id}")
+            await invalidate_cache_pattern(f"orders:list:uid={user_id}")
+        except Exception as exc:
+            logger.warning("Logout cache cleanup error for user %s: %s", user_id, exc)
+        logger.info("Logged out user %s", user_id)
 
     resp = JSONResponse(content={"message": "Logged out successfully"})
     _clear_auth_cookies(resp)

@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Real credentials for /api/rpc must be set via env RPC_USERNAME / RPC_PASSWORD.
     RPC_USERNAME: str = "dev_merchant_api_user"
     RPC_PASSWORD: SecretStr = SecretStr("dev_merchant_api_password")
+    # Optional comma-separated IP allowlist for /api/rpc (the acquirer JSON-RPC
+    # endpoint). When non-empty, only these client IPs may call it, in addition
+    # to Basic Auth. Empty = disabled (no IP restriction) so existing deploys
+    # keep working until the acquirer's IPs are known. Honors TRUST_PROXY for
+    # X-Real-IP resolution. Example: "185.217.131.186,1.2.3.4"
+    RPC_ALLOWED_IPS: str = ""
     EKAYRING_BASE_URL: str = "https://ekayring-api.example.com"
     # App runtime settings (production deploy alignment)
     APP_HOST: str = "0.0.0.0"
